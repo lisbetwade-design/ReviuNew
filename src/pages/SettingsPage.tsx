@@ -364,9 +364,9 @@ export function SettingsPage() {
   const loadSlackChannels = async () => {
     setLoadingChannels(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
+      if (!session) {
         throw new Error('Please sign in to manage Slack channels');
       }
 
@@ -376,12 +376,14 @@ export function SettingsPage() {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Failed to load channels' }));
+        console.error('Response error:', errorData);
         throw new Error(errorData.error || 'Failed to load channels');
       }
 
@@ -401,9 +403,9 @@ export function SettingsPage() {
   const saveListeningChannels = async () => {
     setSaving(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
+      if (!session) {
         throw new Error('Please sign in to save channels');
       }
 
@@ -413,13 +415,15 @@ export function SettingsPage() {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ channels: selectedChannels }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save channels' }));
+        console.error('Response error:', errorData);
         throw new Error(errorData.error || 'Failed to save channels');
       }
 
