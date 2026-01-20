@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: profiles } = await supabaseClient
           .from("profiles")
-          .select("id, slack_team_id, slack_listening_channels")
+          .select("id, slack_team_id, slack_listening_channels, slack_access_token")
           .eq("slack_team_id", body.team_id);
 
         if (!profiles || profiles.length === 0) {
@@ -55,6 +55,27 @@ Deno.serve(async (req: Request) => {
           const listeningChannels = JSON.parse(profile.slack_listening_channels || "[]");
 
           if (listeningChannels.includes(event.channel)) {
+            // Fetch channel information from Slack
+            let channelName = event.channel;
+            if (profile.slack_access_token) {
+              try {
+                const channelInfoResponse = await fetch(
+                  `https://slack.com/api/conversations.info?channel=${event.channel}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${profile.slack_access_token}`,
+                    },
+                  }
+                );
+                const channelInfo = await channelInfoResponse.json();
+                if (channelInfo.ok && channelInfo.channel) {
+                  channelName = channelInfo.channel.name;
+                }
+              } catch (error) {
+                console.error("Error fetching channel info:", error);
+              }
+            }
+
             const { data: projects } = await supabaseClient
               .from("projects")
               .select("id, name")
@@ -94,6 +115,8 @@ Deno.serve(async (req: Request) => {
                   author_email: `slack-${event.user}@slack.com`,
                   content: event.text,
                   status: "open",
+                  source_channel: event.channel,
+                  source_channel_name: channelName,
                 });
               }
             }

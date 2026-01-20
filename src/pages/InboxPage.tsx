@@ -12,6 +12,8 @@ interface FeedbackItem {
   content: string;
   rating: number | null;
   source_type: string;
+  source_channel: string | null;
+  source_channel_name: string | null;
   is_processed: boolean;
   created_at: string;
   viewed_at: string | null;
@@ -84,6 +86,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
           content,
           rating,
           status,
+          source_channel,
+          source_channel_name,
           created_at,
           viewed_at,
           design:designs(
@@ -110,6 +114,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
           content: comment.content,
           rating: comment.rating,
           source_type: isSlack ? 'slack' : (isFigma ? 'figma' : 'web'),
+          source_channel: comment.source_channel,
+          source_channel_name: comment.source_channel_name,
           is_processed: comment.status !== 'open',
           created_at: comment.created_at,
           viewed_at: comment.viewed_at,
@@ -346,6 +352,11 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
                           <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${roleColors[item.stakeholder_role] || roleColors.other}`}>
                             {item.stakeholder_role}
                           </span>
+                          {item.source_channel_name && (
+                            <span className="px-2.5 py-1 rounded-md text-xs font-medium border bg-[#4A154B] text-white border-[#4A154B]">
+                              #{item.source_channel_name}
+                            </span>
+                          )}
                           <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
                             item.is_processed ? statusColors.resolved : statusColors.open
                           }`}>
