@@ -370,18 +370,22 @@ export function SettingsPage() {
         throw new Error('Please sign in to manage Slack channels');
       }
 
-      const { data, error } = await supabase.functions.invoke('slack-channels', {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
+
+      const response = await fetch(apiUrl, {
         method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (error) {
-        console.error('API Error:', error);
-        throw new Error(error.message || 'Failed to load channels');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load channels');
       }
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      const data = await response.json();
 
       setSlackChannels(data.channels || []);
       setSelectedChannels(data.listening_channels || []);
@@ -397,14 +401,26 @@ export function SettingsPage() {
   const saveListeningChannels = async () => {
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('slack-channels', {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error('Please sign in to save channels');
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
-        body: { channels: selectedChannels },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channels: selectedChannels }),
       });
 
-      if (error) {
-        console.error('API Error:', error);
-        throw new Error(error.message || 'Failed to save channels');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save channels');
       }
 
       setProfileData({
