@@ -18,29 +18,29 @@
 
 -- Create storage bucket for design files
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('design-files', 'design-files', true)
+VALUES ('designs', 'designs', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Allow authenticated users to upload files
 CREATE POLICY "Authenticated users can upload design files"
   ON storage.objects FOR INSERT
   TO authenticated
-  WITH CHECK (bucket_id = 'design-files');
+  WITH CHECK (bucket_id = 'designs');
 
 -- Allow authenticated users to update their own files
 CREATE POLICY "Users can update own design files"
   ON storage.objects FOR UPDATE
   TO authenticated
-  USING (bucket_id = 'design-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+  USING (bucket_id = 'designs' AND auth.uid()::text = (storage.foldername(name))[1]);
 
 -- Allow authenticated users to delete their own files
 CREATE POLICY "Users can delete own design files"
   ON storage.objects FOR DELETE
   TO authenticated
-  USING (bucket_id = 'design-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+  USING (bucket_id = 'designs' AND auth.uid()::text = (storage.foldername(name))[1]);
 
 -- Allow public access to read files
 CREATE POLICY "Public can read design files"
   ON storage.objects FOR SELECT
   TO public
-  USING (bucket_id = 'design-files');
+  USING (bucket_id = 'designs');
