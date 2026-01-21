@@ -1,26 +1,30 @@
 import React, { useState, useEffect } from "react";
 
-// Function to fetch Slack Channels using a JWT
-const loadSlackChannels = async (token: string) => {
+const loadSlackChannels = async () => {
   try {
-    const response = await fetch("https://your-api.com/slack/channels", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Dynamically fetch your JWT (replace with your actual implementation)
+    const token = await fetchJWT(); // Function to retrieve a valid JWT dynamically
+    console.log("Using JWT:", token); // Debugging token
+
+    const response = await fetch(
+      "https://gqliajboufsrwkwezhvs.supabase.co/functions/v1/slack-channels",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`, // Add dynamically retrieved JWT
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (!response.ok) {
-      if (response.status === 401) {
-        // Unauthorized error - JWT might be invalid or expired
-        throw new Error("Unauthorized - Your token is invalid or expired. Please refresh your session.");
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("Unauthorized - Your token is invalid or expired.");
       } else {
-        throw new Error(`Error loading channels. Server responded with status: ${response.status}`);
+        throw new Error(`Error loading channels. Server error: ${response.status}`);
       }
     }
 
-    // Return the response as JSON
     return await response.json();
   } catch (error: any) {
     console.error("Error during API request:", error.message || "Unknown error");
@@ -28,7 +32,27 @@ const loadSlackChannels = async (token: string) => {
   }
 };
 
-// Main SettingsPage Component
+const fetchJWT = async (): Promise<string> => {
+  // Replace this block with the logic to fetch/generate a JWT from your backend
+  const response = await fetch("https://your-auth-api.com/generate-jwt", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userId: "your-user-id", // Replace with your app's logic
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch JWT: " + response.status);
+  }
+
+  const data = await response.json();
+  return data.token; // Extract token from API response
+};
+
+// Main Component
 const SettingsPage = () => {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,9 +64,7 @@ const SettingsPage = () => {
       setError(null);
 
       try {
-        // Replace this with your dynamically generated JWT or hook into your authentication flow
-        const jwtToken = "your-new-jwt"; // TODO: Replace with dynamic token retrieval
-        const fetchedChannels = await loadSlackChannels(jwtToken);
+        const fetchedChannels = await loadSlackChannels();
         setChannels(fetchedChannels);
       } catch (err: any) {
         setError(err.message || "Failed to load channels.");
