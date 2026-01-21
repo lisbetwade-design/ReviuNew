@@ -97,7 +97,7 @@ async function fetchChannelNames(
 async function findOrCreateSlackInboxDesign(
   supabaseClient: SupabaseClient,
   userId: string
-): Promise<string | null> {
+): Promise<{ designId: string; projectId: string } | null> {
   console.log(`[DB] Finding or creating Slack Inbox design for user: ${userId}`);
 
   // Get the first project for the user
@@ -135,7 +135,7 @@ async function findOrCreateSlackInboxDesign(
 
   if (existingDesign) {
     console.log(`[DB] Using existing Slack Inbox design: ${existingDesign.id}`);
-    return existingDesign.id;
+    return { designId: existingDesign.id, projectId: project.id };
   }
 
   // Create new "Slack Inbox" design
@@ -157,13 +157,14 @@ async function findOrCreateSlackInboxDesign(
   }
 
   console.log(`[DB] Created new Slack Inbox design: ${newDesign.id}`);
-  return newDesign.id;
+  return { designId: newDesign.id, projectId: project.id };
 }
 
 // Helper function to insert a comment
 async function insertComment(
   supabaseClient: SupabaseClient,
   designId: string,
+  projectId: string,
   event: SlackEvent,
   channelName: string
 ): Promise<void> {
@@ -171,6 +172,7 @@ async function insertComment(
 
   const { error } = await supabaseClient.from("comments").insert({
     design_id: designId,
+    project_id: projectId,
     author_name: event.user || "Slack User",
     author_email: `slack-${event.user}@slack.com`,
     content: event.text,
@@ -309,14 +311,14 @@ Deno.serve(async (req: Request) => {
               console.warn(`[Processing] No access token for profile ${profile.id}, using channel ID`);
             }
 
-            const designId = await findOrCreateSlackInboxDesign(supabaseClient, profile.id);
+            const result = await findOrCreateSlackInboxDesign(supabaseClient, profile.id);
 
-            if (!designId) {
+            if (!result) {
               console.warn(`[Processing] Could not find or create design for profile ${profile.id}`);
               continue;
             }
 
-            await insertComment(supabaseClient, designId, event, channelName);
+            await insertComment(supabaseClient, result.designId, result.projectId, event, channelName);
 
             console.log(`[Processing] Successfully processed message for profile ${profile.id}`);
           } catch (error) {
