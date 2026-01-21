@@ -88,13 +88,13 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
         const fileName = `${user.id}/${projectId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('design-files')
+          .from('designs')
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('design-files')
+          .from('designs')
           .getPublicUrl(fileName);
 
         const { error: insertError } = await supabase
