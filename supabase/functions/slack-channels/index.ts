@@ -17,6 +17,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    console.log("Auth header received:", authHeader ? "Present" : "Missing");
+
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
@@ -39,9 +41,20 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
+    console.log("User auth result:", {
+      hasUser: !!user,
+      userId: user?.id,
+      error: userError?.message,
+      errorStatus: userError?.status
+    });
+
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
+        JSON.stringify({
+          error: "Unauthorized",
+          details: userError?.message,
+          hint: "Your session may have expired. Try signing out and back in."
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

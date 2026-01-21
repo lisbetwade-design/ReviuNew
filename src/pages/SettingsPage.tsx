@@ -364,10 +364,9 @@ export function SettingsPage() {
   const loadSlackChannels = async () => {
     setLoadingChannels(true);
     try {
-      // Refresh session to ensure JWT is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      console.log('Session refresh result:', {
+      console.log('Session result:', {
         hasSession: !!session,
         hasError: !!sessionError,
         errorMessage: sessionError?.message,
@@ -432,8 +431,7 @@ export function SettingsPage() {
   const saveListeningChannels = async () => {
     setSaving(true);
     try {
-      // Refresh session to ensure JWT is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
         throw new Error('Please sign in again to save channels');
