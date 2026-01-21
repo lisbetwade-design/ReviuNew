@@ -367,11 +367,25 @@ export function SettingsPage() {
       // Refresh session to ensure JWT is valid
       const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
 
+      console.log('Session refresh result:', {
+        hasSession: !!session,
+        hasError: !!sessionError,
+        errorMessage: sessionError?.message,
+        userId: session?.user?.id
+      });
+
       if (sessionError || !session) {
+        console.error('Session error:', sessionError);
         throw new Error('Please sign in again to manage Slack channels');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
+
+      console.log('Calling edge function:', {
+        url: apiUrl,
+        hasToken: !!session.access_token,
+        tokenPreview: session.access_token.substring(0, 20) + '...'
+      });
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -382,13 +396,27 @@ export function SettingsPage() {
         },
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to load channels' }));
-        console.error('Response error:', errorData);
-        throw new Error(errorData.error || 'Failed to load channels');
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to load channels' };
+        }
+
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Success! Received data:', {
+        channelsCount: data.channels?.length,
+        listeningCount: data.listening_channels?.length
+      });
 
       setSlackChannels(data.channels || []);
       setSelectedChannels(data.listening_channels || []);
