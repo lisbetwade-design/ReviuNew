@@ -364,10 +364,11 @@ export function SettingsPage() {
   const loadSlackChannels = async () => {
     setLoadingChannels(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh session to ensure JWT is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
 
-      if (!session) {
-        throw new Error('Please sign in to manage Slack channels');
+      if (sessionError || !session) {
+        throw new Error('Please sign in again to manage Slack channels');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
@@ -403,10 +404,11 @@ export function SettingsPage() {
   const saveListeningChannels = async () => {
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh session to ensure JWT is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
 
-      if (!session) {
-        throw new Error('Please sign in to save channels');
+      if (sessionError || !session) {
+        throw new Error('Please sign in again to save channels');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
