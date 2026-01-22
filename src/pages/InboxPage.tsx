@@ -90,6 +90,7 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
           source_channel_name,
           created_at,
           viewed_at,
+          created_by,
           design:designs(
             name,
             source_url,
@@ -97,6 +98,7 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
             project:projects(id, name)
           )
         `)
+        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -199,7 +201,7 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
     : feedbackItems;
 
   const groupedByDesign = filteredFeedback.reduce((acc, item) => {
-    const designKey = `${item.design?.name || 'Unknown Design'}`;
+    const designKey = item.design?.name || (item.source_channel_name ? `Slack: #${item.source_channel_name}` : 'Inbox Messages');
     if (!acc[designKey]) {
       acc[designKey] = [];
     }
@@ -303,40 +305,47 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
         <div className="max-w-6xl mx-auto space-y-8">
           {Object.entries(groupedByDesign).map(([designName, items]) => (
             <div key={designName} className="space-y-4">
-              <button
-                onClick={() => {
-                  if (items[0]) {
-                    handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
-                  }
-                }}
-                className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
-              >
-                <h2 className="font-semibold text-gray-900">{designName}</h2>
-                <span className="text-gray-500">{items.length}</span>
-              </button>
+              {items[0]?.design_id ? (
+                <button
+                  onClick={() => {
+                    if (items[0]) {
+                      handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
+                    }
+                  }}
+                  className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
+                >
+                  <h2 className="font-semibold text-gray-900">{designName}</h2>
+                  <span className="text-gray-500">{items.length}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  <h2 className="font-semibold text-gray-900">{designName}</h2>
+                  <span className="text-gray-500">{items.length}</span>
+                </div>
+              )}
 
-              <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                <FolderOpen size={14} />
-                {items[0]?.design?.project?.id ? (
+              {items[0]?.design?.project?.id && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <FolderOpen size={14} />
                   <button
                     onClick={() => handleProjectClick(items[0].design!.project!.id)}
                     className="hover:text-gray-700 hover:underline transition-colors"
                   >
                     {items[0]?.design?.project?.name}
                   </button>
-                ) : (
-                  <span>{items[0]?.design?.project?.name}</span>
-                )}
-                <span>•</span>
-                <span>{designName}</span>
-              </div>
+                  <span>•</span>
+                  <span>{designName}</span>
+                </div>
+              )}
 
               <div className="space-y-3">
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => handleDesignClick(item.design_id, item.id, !!item.viewed_at)}
-                    className={`border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-all cursor-pointer ${
+                    onClick={() => item.design_id && handleDesignClick(item.design_id, item.id, !!item.viewed_at)}
+                    className={`border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-all ${
+                      item.design_id ? 'cursor-pointer' : ''
+                    } ${
                       item.viewed_at ? 'bg-white' : 'bg-[#F0F9FF]'
                     }`}
                   >

@@ -93,86 +93,17 @@ async function fetchChannelNames(
   return channelMap;
 }
 
-// Helper function to find or create "Slack Inbox" design
-async function findOrCreateSlackInboxDesign(
-  supabaseClient: SupabaseClient,
-  userId: string
-): Promise<{ designId: string; projectId: string } | null> {
-  console.log(`[DB] Finding or creating Slack Inbox design for user: ${userId}`);
-
-  // Get the first project for the user
-  const { data: project, error: projectError } = await supabaseClient
-    .from("projects")
-    .select("id, name")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (projectError) {
-    console.error(`[DB] Error fetching project:`, projectError);
-    throw projectError;
-  }
-
-  if (!project) {
-    console.warn(`[DB] No project found for user ${userId}`);
-    return null;
-  }
-
-  console.log(`[DB] Found project: ${project.name} (${project.id})`);
-
-  // Check if "Slack Inbox" design exists
-  const { data: existingDesign, error: designError } = await supabaseClient
-    .from("designs")
-    .select("id")
-    .eq("project_id", project.id)
-    .eq("name", "Slack Inbox")
-    .maybeSingle();
-
-  if (designError) {
-    console.error(`[DB] Error fetching design:`, designError);
-    throw designError;
-  }
-
-  if (existingDesign) {
-    console.log(`[DB] Using existing Slack Inbox design: ${existingDesign.id}`);
-    return { designId: existingDesign.id, projectId: project.id };
-  }
-
-  // Create new "Slack Inbox" design
-  console.log(`[DB] Creating new Slack Inbox design for project ${project.id}`);
-  const { data: newDesign, error: insertError } = await supabaseClient
-    .from("designs")
-    .insert({
-      project_id: project.id,
-      name: "Slack Inbox",
-      source_type: "slack",
-      source_url: null,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    console.error(`[DB] Error creating design:`, insertError);
-    throw insertError;
-  }
-
-  console.log(`[DB] Created new Slack Inbox design: ${newDesign.id}`);
-  return { designId: newDesign.id, projectId: project.id };
-}
-
 // Helper function to insert a comment
 async function insertComment(
   supabaseClient: SupabaseClient,
-  designId: string,
-  projectId: string,
+  userId: string,
   event: SlackEvent,
   channelName: string
 ): Promise<void> {
-  console.log(`[DB] Inserting comment for design ${designId} from user ${event.user}`);
+  console.log(`[DB] Inserting Slack message from user ${event.user} to inbox`);
 
   const { error } = await supabaseClient.from("comments").insert({
-    design_id: designId,
-    project_id: projectId,
+    created_by: userId,
     author_name: event.user || "Slack User",
     author_email: `slack-${event.user}@slack.com`,
     content: event.text,
@@ -186,7 +117,7 @@ async function insertComment(
     throw error;
   }
 
-  console.log(`[DB] Successfully inserted comment from channel ${channelName}`);
+  console.log(`[DB] Successfully inserted Slack message from channel ${channelName}`);
 }
 
 // Helper function to create consistent JSON response
@@ -311,14 +242,7 @@ Deno.serve(async (req: Request) => {
               console.warn(`[Processing] No access token for profile ${profile.id}, using channel ID`);
             }
 
-            const result = await findOrCreateSlackInboxDesign(supabaseClient, profile.id);
-
-            if (!result) {
-              console.warn(`[Processing] Could not find or create design for profile ${profile.id}`);
-              continue;
-            }
-
-            await insertComment(supabaseClient, result.designId, result.projectId, event, channelName);
+            await insertComment(supabaseClient, profile.id, event, channelName);
 
             console.log(`[Processing] Successfully processed message for profile ${profile.id}`);
           } catch (error) {
