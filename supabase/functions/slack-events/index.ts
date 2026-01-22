@@ -59,7 +59,7 @@ async function fetchChannelNames(
   accessToken: string
 ): Promise<Map<string, string>> {
   const channelMap = new Map<string, string>();
-  
+
   console.log(`[Slack API] Batch fetching info for ${channelIds.length} channel(s): ${channelIds.join(", ")}`);
 
   // Fetch channel info for each unique channel
@@ -74,7 +74,7 @@ async function fetchChannelNames(
         }
       );
       const channelInfo = await response.json();
-      
+
       if (channelInfo.ok && channelInfo.channel) {
         const channelName = channelInfo.channel.name;
         channelMap.set(channelId, channelName);
@@ -93,18 +93,55 @@ async function fetchChannelNames(
   return channelMap;
 }
 
+// Helper function to fetch Slack user information
+async function fetchUserName(
+  userId: string,
+  accessToken: string
+): Promise<string> {
+  console.log(`[Slack API] Fetching user info for ${userId}`);
+
+  try {
+    const response = await fetch(
+      `https://slack.com/api/users.info?user=${userId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    const userInfo = await response.json();
+
+    if (userInfo.ok && userInfo.user) {
+      // Try to get real name first, fall back to display name, then username
+      const name = userInfo.user.real_name ||
+                   userInfo.user.profile?.display_name ||
+                   userInfo.user.name ||
+                   userId;
+      console.log(`[Slack API] User ${userId} -> ${name}`);
+      return name;
+    } else {
+      console.warn(`[Slack API] Failed to fetch info for user ${userId}:`, userInfo.error);
+      return userId; // Fallback to user ID
+    }
+  } catch (error) {
+    console.error(`[Slack API] Error fetching user ${userId}:`, error);
+    return userId; // Fallback to user ID
+  }
+}
+
 // Helper function to insert a comment
 async function insertComment(
   supabaseClient: SupabaseClient,
   userId: string,
   event: SlackEvent,
-  channelName: string
+  channelName: string,
+  userName: string
 ): Promise<void> {
-  console.log(`[DB] Inserting Slack message from user ${event.user} to inbox`);
+  console.log(`[DB] Inserting Slack message from user ${userName} to inbox`);
 
   const { error } = await supabaseClient.from("comments").insert({
     created_by: userId,
-    author_name: event.user || "Slack User",
+    author_name: userName,
     author_email: `slack-${event.user}@slack.com`,
     content: event.text,
     status: "open",
@@ -230,19 +267,24 @@ Deno.serve(async (req: Request) => {
           try {
             console.log(`[Processing] Processing message for profile ${profile.id}`);
 
-            // Fetch channel name using this profile's access token
+            // Fetch channel name and user name using this profile's access token
             let channelName = event.channel;
+            let userName = event.user || "Slack User";
+
             if (profile.slack_access_token) {
               const channelMap = await fetchChannelNames(
                 [event.channel],
                 profile.slack_access_token
               );
               channelName = channelMap.get(event.channel) || event.channel;
+
+              // Fetch the actual user's name
+              userName = await fetchUserName(event.user, profile.slack_access_token);
             } else {
-              console.warn(`[Processing] No access token for profile ${profile.id}, using channel ID`);
+              console.warn(`[Processing] No access token for profile ${profile.id}, using channel ID and user ID`);
             }
 
-            await insertComment(supabaseClient, profile.id, event, channelName);
+            await insertComment(supabaseClient, profile.id, event, channelName, userName);
 
             console.log(`[Processing] Successfully processed message for profile ${profile.id}`);
           } catch (error) {
