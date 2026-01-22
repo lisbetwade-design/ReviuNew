@@ -69,6 +69,12 @@ export function SettingsPage() {
     loadFigmaConnection();
   }, []);
 
+  useEffect(() => {
+    if (profileData.slack_access_token && selectedChannels.length > 0 && slackChannels.length === 0) {
+      loadSlackChannelsQuietly();
+    }
+  }, [profileData.slack_access_token, selectedChannels.length]);
+
   const loadProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -358,6 +364,30 @@ export function SettingsPage() {
       alert('Failed to disconnect Slack. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const loadSlackChannelsQuietly = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSlackChannels(data.channels || []);
+      }
+    } catch (error) {
+      console.error('Error loading channels quietly:', error);
     }
   };
 
