@@ -154,9 +154,6 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
       }));
 
       setProjects(projectList);
-      if (projectList.length > 0 && !activeProjectId) {
-        setActiveProjectId(projectList[0].id);
-      }
     } catch (error) {
       console.error('Error loading feedback:', error);
     } finally {
