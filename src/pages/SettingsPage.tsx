@@ -285,6 +285,7 @@ export function SettingsPage() {
         'im:history',
         'mpim:read',
         'mpim:history',
+        'users:read',
       ].join(',');
 
       const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}`;
