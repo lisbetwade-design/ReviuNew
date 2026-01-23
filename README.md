@@ -35,12 +35,11 @@ To get these:
 2. Create a new OAuth App or GitHub App
 3. Set the callback URL to: `https://0ec90b57d6e95fcbda19832f.supabase.co/functions/v1/github-oauth-callback`
 4. Set the webhook URL to: `https://0ec90b57d6e95fcbda19832f.supabase.co/functions/v1/github-webhook`
-5. Configure the following scopes/permissions:
-   - `current_user:read` - Read user profile information
-   - `file_comments:read` - Read file comments
-   - `projects:read` - Read project structure
-   - `webhooks:read` - Read webhooks
-   - `webhooks:write` - Manage webhooks
+5. Configure the following permissions:
+   - **User Profile Access** (`read:user`) - Read user profile information (name, email, profile image)
+   - **Repository Access** (`repo` scope) - Read file comments and repository contents
+   - **Project Access** (`read:project`) - Read project structure, including private projects
+   - **Webhook Management** (`admin:repo_hook`, `admin:org_hook`) - Read, create, modify, and delete webhooks
 
 For detailed setup instructions, see [.github/GITHUB_INTEGRATION.md](.github/GITHUB_INTEGRATION.md)
 

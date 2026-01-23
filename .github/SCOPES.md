@@ -2,10 +2,13 @@
 
 This document provides the exact scope configuration required for the `lisbetwade-design/ReviuNew` GitHub repository integration.
 
+> **Note**: The requirement names (e.g., "current_user:read") are descriptive labels from the original requirements. Each requirement maps to specific GitHub OAuth scopes or GitHub App permissions, which are listed under each section.
+
 ## Required Scopes
 
-### 1. current_user:read
-**Scope**: `read:user`
+### 1. Requirement: current_user:read
+**GitHub OAuth Scope**: `read:user`
+**GitHub App Permission**: User: Email addresses (read)
 
 **Description**: Needed to read the current user's name, email, and profile image.
 
@@ -19,8 +22,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 
 ---
 
-### 2. file_comments:read
-**Scope**: `repo` (for private repos) or `public_repo` (for public repos only)
+### 2. Requirement: file_comments:read
+**GitHub OAuth Scope**: `repo` (for private repos) or `public_repo` (for public repos only)
+**GitHub App Permission**: Repository: Contents (read), Pull Requests (read)
 
 **Description**: Needed to read comments in accessible files.
 
@@ -35,8 +39,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 
 ---
 
-### 3. projects:read
-**Scope**: `read:project`
+### 3. Requirement: projects:read
+**GitHub OAuth Scope**: `read:project`
+**GitHub App Permission**: Organization: Projects (read)
 
 **Description**: Needed to read team project structure, even for private projects.
 
@@ -55,8 +60,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 
 ### 4. Webhooks Scopes
 
-#### webhooks:read
-**Scope**: `read:repo_hook` or `read:org_hook`
+#### Requirement: webhooks:read
+**GitHub OAuth Scope**: `read:repo_hook` or `read:org_hook`
+**GitHub App Permission**: Repository/Organization Administration (read is included in write)
 
 **Description**: Required to read and list webhooks.
 
@@ -72,8 +78,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 
 ---
 
-#### webhooks:write
-**Scope**: `admin:repo_hook` or `admin:org_hook`
+#### Requirement: webhooks:write
+**GitHub OAuth Scope**: `admin:repo_hook` or `admin:org_hook`
+**GitHub App Permission**: Repository/Organization Administration (write)
 
 **Description**: Required to create, modify, and delete webhooks.
 
