@@ -41,7 +41,7 @@ This document provides the exact scope configuration required for the `lisbetwad
 
 ### 3. Requirement: projects:read
 **GitHub OAuth Scope**: `read:project`
-**GitHub App Permission**: Organization: Projects (read)
+**GitHub App Permission**: Organization: Administration (write) - includes access to organization projects
 
 **Description**: Needed to read team project structure, even for private projects.
 
@@ -53,7 +53,7 @@ This document provides the exact scope configuration required for the `lisbetwad
 - `GET /projects/columns/{column_id}/cards` - List project cards
 
 **Permissions Required**:
-- Organization: Projects (read)
+- Organization: Administration (write) - provides access to organization projects
 - Repository: Projects (read)
 
 ---
@@ -72,9 +72,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 - `GET /orgs/{org}/hooks` - List organization webhooks
 - `GET /orgs/{org}/hooks/{hook_id}` - Get an organization webhook
 
-**Permissions Required**:
-- Repository: Webhooks (read)
-- Organization: Webhooks (read)
+**Permissions Required (GitHub Apps)**:
+- Repository: Administration (write) - provides webhook access
+- Organization: Administration (write) - provides webhook access
 
 ---
 
@@ -94,9 +94,9 @@ This document provides the exact scope configuration required for the `lisbetwad
 - `POST /repos/{owner}/{repo}/hooks/{hook_id}/tests` - Test a repository webhook
 - `POST /repos/{owner}/{repo}/hooks/{hook_id}/pings` - Ping a repository webhook
 
-**Permissions Required**:
-- Repository: Webhooks (read & write)
-- Organization: Webhooks (read & write)
+**Permissions Required (GitHub Apps)**:
+- Repository: Administration (write) - provides full webhook management
+- Organization: Administration (write) - provides full webhook management
 
 ---
 
