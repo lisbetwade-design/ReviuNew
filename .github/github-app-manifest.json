@@ -14,7 +14,10 @@
     "metadata": "read",
     "contents": "read",
     "issues": "read",
-    "pull_requests": "read"
+    "pull_requests": "read",
+    "organization_hooks": "write",
+    "repository_hooks": "write",
+    "organization_projects": "read"
   },
   "default_events": [
     "issues",
