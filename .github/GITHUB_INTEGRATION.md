@@ -48,11 +48,12 @@ Create a GitHub App with the following permissions:
 
 **Organization Permissions:**
 - Members: Read
-- Projects: Read
-- Administration: Write (provides webhook management)
+- Administration: Write (provides webhook management and access to organization projects)
 
 **User Permissions:**
 - Email addresses: Read
+
+**Note:** The `organization_administration: write` permission provides access to both organization webhooks and organization projects, fulfilling the `projects:read` and `webhooks:read/write` requirements for organization-level resources.
 
 **Subscribe to events:**
 - Issues

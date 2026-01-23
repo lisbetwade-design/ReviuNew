@@ -16,8 +16,7 @@
     "issues": "read",
     "pull_requests": "read",
     "organization_administration": "write",
-    "administration": "write",
-    "organization_projects": "read"
+    "administration": "write"
   },
   "default_events": [
     "issues",

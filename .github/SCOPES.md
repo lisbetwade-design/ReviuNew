@@ -121,9 +121,7 @@ Configure the following permissions in your GitHub App:
 ```json
 {
   "members": "read",
-  "projects": "read",
-  "organization_administration": "write",
-  "organization_projects": "read"
+  "organization_administration": "write"
 }
 ```
 
