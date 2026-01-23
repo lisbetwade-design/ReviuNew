@@ -1,0 +1,28 @@
+{
+  "name": "Reviu GitHub Integration",
+  "url": "https://github.com/lisbetwade-design/ReviuNew",
+  "hook_attributes": {
+    "url": "https://0ec90b57d6e95fcbda19832f.supabase.co/functions/v1/github-webhook"
+  },
+  "redirect_url": "https://0ec90b57d6e95fcbda19832f.supabase.co/functions/v1/github-oauth-callback",
+  "callback_urls": [
+    "https://0ec90b57d6e95fcbda19832f.supabase.co/functions/v1/github-oauth-callback"
+  ],
+  "public": false,
+  "default_permissions": {
+    "members": "read",
+    "metadata": "read",
+    "contents": "read",
+    "issues": "read",
+    "pull_requests": "read",
+    "organization_administration": "write",
+    "administration": "write"
+  },
+  "default_events": [
+    "issues",
+    "issue_comment",
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_comment"
+  ]
+}
