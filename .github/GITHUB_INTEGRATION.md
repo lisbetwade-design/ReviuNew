@@ -43,13 +43,13 @@ Create a GitHub App with the following permissions:
 - Contents: Read
 - Issues: Read
 - Pull Requests: Read
-- Webhooks: Read & Write
+- Administration: Write (provides webhook management)
 - Metadata: Read
 
 **Organization Permissions:**
 - Members: Read
 - Projects: Read
-- Webhooks: Read & Write
+- Administration: Write (provides webhook management)
 
 **User Permissions:**
 - Email addresses: Read

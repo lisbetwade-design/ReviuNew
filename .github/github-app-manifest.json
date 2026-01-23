@@ -15,8 +15,8 @@
     "contents": "read",
     "issues": "read",
     "pull_requests": "read",
-    "organization_hooks": "write",
-    "repository_hooks": "write",
+    "organization_administration": "write",
+    "administration": "write",
     "organization_projects": "read"
   },
   "default_events": [

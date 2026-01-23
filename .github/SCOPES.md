@@ -106,7 +106,7 @@ Configure the following permissions in your GitHub App:
   "issues": "read",
   "metadata": "read",
   "pull_requests": "read",
-  "webhooks": "read_write"
+  "administration": "write"
 }
 ```
 
@@ -115,7 +115,8 @@ Configure the following permissions in your GitHub App:
 {
   "members": "read",
   "projects": "read",
-  "webhooks": "read_write"
+  "organization_administration": "write",
+  "organization_projects": "read"
 }
 ```
 
