@@ -196,11 +196,44 @@ export function SettingsPage() {
 
       if (error) throw error;
 
+      const { error: tokenError } = await supabase
+        .from('profiles')
+        .update({ figma_token: null })
+        .eq('id', user.id);
+
+      if (tokenError) console.error('Error clearing token:', tokenError);
+
       setFigmaConnection(null);
+      setProfileData({ ...profileData, figma_token: '' });
       alert('Figma disconnected successfully!');
     } catch (error) {
       console.error('Error disconnecting Figma:', error);
       alert('Failed to disconnect Figma. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMcpToken = async () => {
+    if (!confirm('Are you sure you want to remove your Figma MCP token?')) return;
+
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ figma_token: null })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfileData({ ...profileData, figma_token: '' });
+      alert('MCP token removed successfully!');
+    } catch (error) {
+      console.error('Error removing MCP token:', error);
+      alert('Failed to remove MCP token. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -619,7 +652,7 @@ export function SettingsPage() {
                               </div>
                               <div>
                                 <h4 className="text-lg font-semibold text-gray-900 mb-1">
-                                  Connected to Figma
+                                  Connected to Figma (OAuth)
                                 </h4>
                                 <p className="text-sm text-gray-600 mb-2">
                                   Account: <span className="font-medium">{figmaConnection.figma_user_email}</span>
@@ -660,48 +693,187 @@ export function SettingsPage() {
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl p-6">
-                        <div className="flex items-start gap-4 mb-6">
-                          <div className="bg-gray-300 rounded-xl p-3">
-                            <Link2 size={24} className="text-gray-600" />
-                          </div>
-                          <div>
-                            <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                              Connect your Figma account
-                            </h4>
-                            <p className="text-sm text-gray-600 mb-4">
-                              We'll only read comments. You can disconnect anytime.
-                            </p>
-                            <ul className="space-y-2 text-sm text-gray-600 mb-4">
-                              <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                                Track comments from specific Figma files
-                              </li>
-                              <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                                Automatic sync of new comments
-                              </li>
-                              <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                                Choose which comments to track
-                              </li>
-                            </ul>
+                    ) : profileData.figma_token ? (
+                      <div className="space-y-6">
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-4">
+                              <div className="bg-blue-500 rounded-xl p-3">
+                                <CheckCircle size={24} className="text-white" />
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900 mb-1">
+                                  Connected to Figma (MCP)
+                                </h4>
+                                <p className="text-sm text-gray-600 mb-2">
+                                  Using Personal Access Token
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Token: {profileData.figma_token.substring(0, 20)}...
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleRemoveMcpToken}
+                              disabled={saving}
+                              className="flex items-center gap-2 px-4 py-2 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              <XCircle size={18} />
+                              Remove
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={handleConnectFigma}
-                          className="flex items-center gap-3 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-all hover:shadow-lg"
-                        >
-                          <svg width="20" height="20" viewBox="0 0 38 57" fill="currentColor">
-                            <path d="M19 28.5C19 25.18 21.69 22.5 25 22.5C28.31 22.5 31 25.18 31 28.5C31 31.82 28.31 34.5 25 34.5C21.69 34.5 19 31.82 19 28.5Z"/>
-                            <path d="M7 46.5C7 43.18 9.69 40.5 13 40.5H19V46.5C19 49.82 16.31 52.5 13 52.5C9.69 52.5 7 49.82 7 46.5Z"/>
-                            <path d="M19 4.5V16.5H25C28.31 16.5 31 13.82 31 10.5C31 7.18 28.31 4.5 25 4.5H19Z"/>
-                            <path d="M7 10.5C7 13.82 9.69 16.5 13 16.5H19V4.5H13C9.69 4.5 7 7.18 7 10.5Z"/>
-                            <path d="M7 28.5C7 31.82 9.69 34.5 13 34.5H19V22.5H13C9.69 22.5 7 25.18 7 28.5Z"/>
-                          </svg>
-                          Connect Figma
-                        </button>
+
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+                          <div className="flex items-start gap-3 mb-4">
+                            <div className="bg-blue-100 rounded-xl p-2.5">
+                              <SettingsIcon size={20} className="text-[#2563EB]" />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-1">
+                                Update MCP Token
+                              </h4>
+                              <p className="text-sm text-gray-600 mb-4">
+                                Change your Figma personal access token.
+                              </p>
+                              <div className="bg-gray-50 rounded-xl p-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  New Token
+                                </label>
+                                <input
+                                  type="password"
+                                  value={profileData.figma_token}
+                                  onChange={(e) => setProfileData({ ...profileData, figma_token: e.target.value })}
+                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] mb-3"
+                                  placeholder="figd_..."
+                                />
+                                <button
+                                  onClick={saveProfile}
+                                  disabled={saving}
+                                  className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                                >
+                                  <Save size={18} />
+                                  {saving ? 'Updating...' : 'Update Token'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl p-6">
+                          <div className="flex items-start gap-4 mb-6">
+                            <div className="bg-gray-300 rounded-xl p-3">
+                              <Link2 size={24} className="text-gray-600" />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                Connect via OAuth (Recommended)
+                              </h4>
+                              <p className="text-sm text-gray-600 mb-4">
+                                Quick and secure connection with automatic token management.
+                              </p>
+                              <ul className="space-y-2 text-sm text-gray-600 mb-4">
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Track comments from specific Figma files
+                                </li>
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Automatic sync of new comments
+                                </li>
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Secure with automatic token refresh
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleConnectFigma}
+                            className="flex items-center gap-3 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-all hover:shadow-lg"
+                          >
+                            <svg width="20" height="20" viewBox="0 0 38 57" fill="currentColor">
+                              <path d="M19 28.5C19 25.18 21.69 22.5 25 22.5C28.31 22.5 31 25.18 31 28.5C31 31.82 28.31 34.5 25 34.5C21.69 34.5 19 31.82 19 28.5Z"/>
+                              <path d="M7 46.5C7 43.18 9.69 40.5 13 40.5H19V46.5C19 49.82 16.31 52.5 13 52.5C9.69 52.5 7 49.82 7 46.5Z"/>
+                              <path d="M19 4.5V16.5H25C28.31 16.5 31 13.82 31 10.5C31 7.18 28.31 4.5 25 4.5H19Z"/>
+                              <path d="M7 10.5C7 13.82 9.69 16.5 13 16.5H19V4.5H13C9.69 4.5 7 7.18 7 10.5Z"/>
+                              <path d="M7 28.5C7 31.82 9.69 34.5 13 34.5H19V22.5H13C9.69 22.5 7 25.18 7 28.5Z"/>
+                            </svg>
+                            Connect via OAuth
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-300"></div>
+                          </div>
+                          <div className="relative flex justify-center text-sm">
+                            <span className="px-4 bg-[#F6F7F9] text-gray-500">or</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-6">
+                          <div className="flex items-start gap-4 mb-6">
+                            <div className="bg-blue-500 rounded-xl p-3">
+                              <Key size={24} className="text-white" />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                Connect via MCP (Personal Access Token)
+                              </h4>
+                              <p className="text-sm text-gray-600 mb-4">
+                                Use your Figma personal access token for direct API access.
+                              </p>
+                              <ul className="space-y-2 text-sm text-gray-600 mb-4">
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Direct API access without OAuth
+                                </li>
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Full control over token permissions
+                                </li>
+                                <li className="flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  Manual token management
+                                </li>
+                              </ul>
+                              <div className="bg-white rounded-xl p-4 mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Figma Personal Access Token
+                                </label>
+                                <input
+                                  type="password"
+                                  value={profileData.figma_token}
+                                  onChange={(e) => setProfileData({ ...profileData, figma_token: e.target.value })}
+                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                  placeholder="figd_..."
+                                />
+                                <p className="mt-2 text-xs text-gray-500">
+                                  Get your token from{' '}
+                                  <a
+                                    href="https://www.figma.com/developers/api#access-tokens"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#2563EB] hover:underline"
+                                  >
+                                    Figma Settings
+                                  </a>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={saveProfile}
+                            disabled={saving || !profileData.figma_token}
+                            className="flex items-center gap-3 px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Save size={18} />
+                            {saving ? 'Saving...' : 'Save MCP Token'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
