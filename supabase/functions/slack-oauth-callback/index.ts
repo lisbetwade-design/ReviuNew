@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Redirect back to app with success message
-    const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
+    const appUrl = Deno.env.get("APP_URL") || "https://reviu-jmxo.bolt.host";
 
     // Create a simple HTML page that closes the window and notifies parent
     const html = `

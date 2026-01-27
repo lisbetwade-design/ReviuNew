@@ -44,7 +44,7 @@ To get these:
 For detailed setup instructions, see [.github/GITHUB_INTEGRATION.md](.github/GITHUB_INTEGRATION.md)
 
 ### Optional
-- `APP_URL` - Your application URL (defaults to http://localhost:5173)
+- `APP_URL` - Your application URL (defaults to https://reviu-jmxo.bolt.host)
 
 ### Frontend Environment Variables
 Add to `.env`:
