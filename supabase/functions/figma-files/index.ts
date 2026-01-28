@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: connection } = await supabaseClient
           .from("figma_connections")
-          .select("access_token")
+          .select("access_token, refresh_token, expires_at")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -75,9 +75,50 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        let accessToken = connection.access_token;
+        const expiresAt = new Date(connection.expires_at);
+        const now = new Date();
+
+        if (expiresAt <= now && connection.refresh_token) {
+          const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+          const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+          if (clientId && clientSecret) {
+            const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                refresh_token: connection.refresh_token,
+              }),
+            });
+
+            if (refreshResponse.ok) {
+              const tokenData = await refreshResponse.json();
+              accessToken = tokenData.access_token;
+
+              await supabaseClient
+                .from("figma_connections")
+                .update({
+                  access_token: tokenData.access_token,
+                  expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+                })
+                .eq("user_id", user.id);
+            } else {
+              return new Response(JSON.stringify({ error: "Figma token expired. Please reconnect your Figma account." }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+        }
+
         const fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
           headers: {
-            Authorization: `Bearer ${connection.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
