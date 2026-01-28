@@ -136,15 +136,28 @@ export function SettingsPage() {
 
   const handleConnectFigma = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Please sign in to connect Figma.');
+        return;
+      }
 
-      const clientId = import.meta.env.VITE_FIGMA_CLIENT_ID;
-      const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-oauth-callback`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-oauth-start`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      const scopes = 'file_read';
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to start OAuth' }));
+        throw new Error(errorData.error || 'Failed to start Figma OAuth');
+      }
 
-      const authUrl = `https://www.figma.com/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${user.id}&response_type=code`;
+      const { authorization_url } = await response.json();
 
       const width = 600;
       const height = 700;
@@ -152,32 +165,42 @@ export function SettingsPage() {
       const top = window.screenY + (window.outerHeight - height) / 2;
 
       const popup = window.open(
-        authUrl,
+        authorization_url,
         'Figma OAuth',
         `width=${width},height=${height},left=${left},top=${top}`
       );
 
-      const pollInterval = setInterval(async () => {
-        const { data } = await supabase
-          .from('figma_connections')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (data) {
-          clearInterval(pollInterval);
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'figma-oauth-success') {
+          window.removeEventListener('message', handleMessage);
           if (popup && !popup.closed) {
             popup.close();
           }
-          setFigmaConnection(data);
+          loadFigmaConnection();
           alert('Successfully connected to Figma!');
+        } else if (event.data?.type === 'figma-oauth-error') {
+          window.removeEventListener('message', handleMessage);
+          alert(`Figma connection failed: ${event.data.error}`);
         }
-      }, 1000);
+      };
 
-      setTimeout(() => clearInterval(pollInterval), 300000);
+      window.addEventListener('message', handleMessage);
+
+      const pollInterval = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', handleMessage);
+          loadFigmaConnection();
+        }
+      }, 500);
+
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+      }, 300000);
     } catch (error) {
       console.error('Error connecting to Figma:', error);
-      alert('Failed to connect to Figma. Please try again.');
+      alert(`Failed to connect to Figma: ${error instanceof Error ? error.message : 'Please try again.'}`);
     }
   };
 
