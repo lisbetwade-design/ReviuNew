@@ -100,8 +100,9 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (connError || !connection) {
+      console.error("Figma connection error:", connError);
       return new Response(
-        JSON.stringify({ error: "Figma not connected" }),
+        JSON.stringify({ error: "Figma not connected", details: connError?.message }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -109,7 +110,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    console.log("Decrypting access token for user:", user.id);
     const accessToken = await decryptToken(connection.access_token);
+    console.log("Access token decrypted successfully");
 
     const query = file_id
       ? supabaseClient.from("figma_tracked_files").select("*").eq("id", file_id).eq("user_id", user.id)
@@ -135,6 +138,7 @@ Deno.serve(async (req: Request) => {
 
     for (const trackedFile of trackedFiles) {
       try {
+        console.log(`Syncing file: ${trackedFile.file_name} (${trackedFile.file_key})`);
         const commentsResponse = await fetch(
           `https://api.figma.com/v1/files/${trackedFile.file_key}/comments`,
           {
@@ -145,12 +149,14 @@ Deno.serve(async (req: Request) => {
         );
 
         if (!commentsResponse.ok) {
-          console.error(`Failed to fetch comments for ${trackedFile.file_key}:`, await commentsResponse.text());
+          const errorText = await commentsResponse.text();
+          console.error(`Failed to fetch comments for ${trackedFile.file_key}:`, errorText);
           continue;
         }
 
         const commentsData = await commentsResponse.json();
         const comments = commentsData.comments || [];
+        console.log(`Found ${comments.length} comments in Figma file`);
 
         const { data: preferences } = await serviceClient
           .from("figma_sync_preferences")
@@ -204,9 +210,13 @@ Deno.serve(async (req: Request) => {
             .eq("content", comment.message)
             .maybeSingle();
 
-          if (existing) continue;
+          if (existing) {
+            console.log(`Comment already exists, skipping: ${comment.id}`);
+            continue;
+          }
 
-          await serviceClient.from("comments").insert({
+          console.log(`Inserting new comment: ${comment.id}`);
+          const { error: insertError } = await serviceClient.from("comments").insert({
             design_id: designId,
             project_id: trackedFile.project_id,
             created_by: trackedFile.user_id,
@@ -219,7 +229,12 @@ Deno.serve(async (req: Request) => {
             source_channel: "figma",
           });
 
-          totalCommentsSynced++;
+          if (insertError) {
+            console.error("Error inserting comment:", insertError);
+          } else {
+            totalCommentsSynced++;
+            console.log(`Comment inserted successfully`);
+          }
         }
 
         await serviceClient
