@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const scopes = "files:read";
+    const scopes = "file_content:read";
     const authUrl = new URL("https://www.figma.com/oauth");
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
