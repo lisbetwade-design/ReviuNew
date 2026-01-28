@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        const fileKeyMatch = fileUrl.match(/file\/([a-zA-Z0-9]+)/);
+        const fileKeyMatch = fileUrl.match(/(?:file|design)\/([a-zA-Z0-9]+)/);
         if (!fileKeyMatch) {
           return new Response(JSON.stringify({ error: "Invalid Figma URL" }), {
             status: 400,
