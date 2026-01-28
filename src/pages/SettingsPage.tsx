@@ -136,8 +136,9 @@ export function SettingsPage() {
 
   const handleConnectFigma = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
         alert('Please sign in to connect Figma.');
         return;
       }
@@ -153,8 +154,16 @@ export function SettingsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to start OAuth' }));
-        throw new Error(errorData.error || 'Failed to start Figma OAuth');
+        const errorText = await response.text();
+        console.error('OAuth start error:', response.status, errorText);
+        let errorMessage = 'Failed to start Figma OAuth';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const { authorization_url } = await response.json();
