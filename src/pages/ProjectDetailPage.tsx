@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, MoreVertical, ExternalLink, Share2, Trash2, Folder, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Plus, MoreVertical, ExternalLink, Share2, Trash2, Folder, Image as ImageIcon, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AddDesignModal } from '../components/AddDesignModal';
 import { DesignViewerPage } from './DesignViewerPage';
@@ -25,6 +25,16 @@ interface DesignFolder {
   designs: Design[];
 }
 
+interface FigmaTrackedFile {
+  id: string;
+  file_key: string;
+  file_name: string;
+  file_url: string;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  created_at: string;
+}
+
 interface ProjectDetailPageProps {
   projectId: string;
   projectName: string;
@@ -34,6 +44,7 @@ interface ProjectDetailPageProps {
 export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDetailPageProps) {
   const [folders, setFolders] = useState<DesignFolder[]>([]);
   const [standaloneDesigns, setStandaloneDesigns] = useState<Design[]>([]);
+  const [figmaFiles, setFigmaFiles] = useState<FigmaTrackedFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -46,7 +57,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
 
   const loadDesigns = async () => {
     try {
-      const [foldersResult, designsResult] = await Promise.all([
+      const [foldersResult, designsResult, figmaResult] = await Promise.all([
         supabase
           .from('design_folders')
           .select('*, designs(*)')
@@ -58,13 +69,20 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
           .eq('project_id', projectId)
           .is('folder_id', null)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('figma_tracked_files')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (foldersResult.error) throw foldersResult.error;
       if (designsResult.error) throw designsResult.error;
+      if (figmaResult.error) throw figmaResult.error;
 
       setFolders(foldersResult.data || []);
       setStandaloneDesigns(designsResult.data || []);
+      setFigmaFiles(figmaResult.data || []);
     } catch (error) {
       console.error('Error loading designs:', error);
     } finally {
@@ -182,7 +200,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
       </div>
 
       <div className="flex-1 overflow-auto p-8">
-        {folders.length === 0 && standaloneDesigns.length === 0 ? (
+        {folders.length === 0 && standaloneDesigns.length === 0 && figmaFiles.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#F6F8FE] mb-6">
@@ -278,6 +296,60 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {figmaFiles.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Figma Files</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {figmaFiles.map((file) => (
+                    <a
+                      key={file.id}
+                      href={file.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg hover:border-[#2563EB] transition-all"
+                    >
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <FileText size={24} className="text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 truncate">{file.file_name}</h4>
+                          <p className="text-xs text-gray-500 mt-1">Figma File</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                          file.sync_enabled
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {file.sync_enabled ? 'Syncing Comments' : 'Sync Paused'}
+                        </span>
+                      </div>
+
+                      {file.last_synced_at ? (
+                        <p className="text-xs text-gray-500">
+                          Last synced: {new Date(file.last_synced_at).toLocaleString()}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          Added: {new Date(file.created_at).toLocaleDateString()}
+                        </p>
+                      )}
+
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center gap-2 text-sm text-[#2563EB]">
+                          <ExternalLink size={16} />
+                          <span>Open in Figma</span>
+                        </div>
+                      </div>
+                    </a>
                   ))}
                 </div>
               </div>

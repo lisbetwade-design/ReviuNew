@@ -24,6 +24,20 @@ interface FigmaConnection {
   created_at: string;
 }
 
+interface FigmaTrackedFile {
+  id: string;
+  file_key: string;
+  file_name: string;
+  file_url: string;
+  project_id: string;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  project?: {
+    id: string;
+    name: string;
+  };
+}
+
 interface SlackChannel {
   id: string;
   name: string;
@@ -63,10 +77,12 @@ export function SettingsPage() {
   const [showChannelSelector, setShowChannelSelector] = useState(false);
   const [figmaConnection, setFigmaConnection] = useState<FigmaConnection | null>(null);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [trackedFiles, setTrackedFiles] = useState<FigmaTrackedFile[]>([]);
 
   useEffect(() => {
     loadProfile();
     loadFigmaConnection();
+    loadTrackedFiles();
   }, []);
 
   useEffect(() => {
@@ -131,6 +147,46 @@ export function SettingsPage() {
       setFigmaConnection(data);
     } catch (error) {
       console.error('Error loading Figma connection:', error);
+    }
+  };
+
+  const loadTrackedFiles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('figma_tracked_files')
+        .select(`
+          *,
+          project:projects(id, name)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTrackedFiles(data || []);
+    } catch (error) {
+      console.error('Error loading tracked files:', error);
+    }
+  };
+
+  const handleRemoveFile = async (fileId: string) => {
+    if (!confirm('Are you sure you want to stop tracking this file?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('figma_tracked_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      await loadTrackedFiles();
+      alert('File removed successfully!');
+    } catch (error) {
+      console.error('Error removing file:', error);
+      alert('Failed to remove file. Please try again.');
     }
   };
 
@@ -723,6 +779,59 @@ export function SettingsPage() {
                               Add File
                             </button>
                           </div>
+
+                          {trackedFiles.length > 0 ? (
+                            <div className="mt-4 space-y-3">
+                              {trackedFiles.map((file) => (
+                                <div
+                                  key={file.id}
+                                  className="flex items-start justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <a
+                                        href={file.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-medium text-gray-900 hover:text-[#2563EB] transition-colors truncate"
+                                      >
+                                        {file.file_name}
+                                      </a>
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                        file.sync_enabled
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-gray-200 text-gray-600'
+                                      }`}>
+                                        {file.sync_enabled ? 'Syncing' : 'Paused'}
+                                      </span>
+                                    </div>
+                                    {file.project && (
+                                      <p className="text-sm text-gray-600">
+                                        Project: {file.project.name}
+                                      </p>
+                                    )}
+                                    {file.last_synced_at && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Last synced: {new Date(file.last_synced_at).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveFile(file.id)}
+                                    className="ml-4 text-red-600 hover:text-red-700 transition-colors"
+                                  >
+                                    <XCircle size={20} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-4 p-6 bg-gray-50 border border-gray-200 rounded-xl text-center">
+                              <p className="text-sm text-gray-600">
+                                No files tracked yet. Click "Add File" to get started.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : profileData.figma_token ? (
@@ -1305,6 +1414,7 @@ export function SettingsPage() {
         onClose={() => setShowAddFileModal(false)}
         onFileAdded={() => {
           loadFigmaConnection();
+          loadTrackedFiles();
         }}
       />
     </div>
