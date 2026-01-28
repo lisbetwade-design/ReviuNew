@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        const fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
+        let fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -124,6 +124,57 @@ Deno.serve(async (req: Request) => {
 
         if (!fileResponse.ok) {
           const errorData = await fileResponse.json();
+
+          if (errorData.err === "Invalid token" && connection.refresh_token) {
+            const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+            const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+            if (clientId && clientSecret) {
+              const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  refresh_token: connection.refresh_token,
+                }),
+              });
+
+              if (refreshResponse.ok) {
+                const tokenData = await refreshResponse.json();
+                accessToken = tokenData.access_token;
+
+                await supabaseClient
+                  .from("figma_connections")
+                  .update({
+                    access_token: tokenData.access_token,
+                    expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+                  })
+                  .eq("user_id", user.id);
+
+                fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                });
+
+                if (fileResponse.ok) {
+                  const fileData = await fileResponse.json();
+                  return new Response(JSON.stringify({
+                    file_key: fileKey,
+                    file_name: fileData.name,
+                    file_url: fileUrl,
+                  }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                  });
+                }
+              }
+            }
+          }
+
           const errorMessage = errorData.err === "Invalid token"
             ? "Figma token is invalid or has been revoked. Please disconnect and reconnect your Figma account in Settings."
             : errorData.err || "Failed to fetch file info";
