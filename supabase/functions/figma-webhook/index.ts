@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: trackedFile, error: fileError } = await supabaseClient
         .from("figma_tracked_files")
-        .select("*, figma_connections!inner(access_token, user_id)")
+        .select("*")
         .eq("file_key", fileKey)
         .eq("sync_enabled", true)
         .maybeSingle();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Link2, Settings as SettingsIcon, Save, Key, CreditCard, CheckCircle, XCircle, Hash } from 'lucide-react';
+import { User, Link2, Settings as SettingsIcon, Save, Key, CreditCard, CheckCircle, XCircle, Hash, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { AddFigmaFileModal } from '../components/AddFigmaFileModal';
 import { supabase } from '../lib/supabase';
@@ -78,6 +78,7 @@ export function SettingsPage() {
   const [figmaConnection, setFigmaConnection] = useState<FigmaConnection | null>(null);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [trackedFiles, setTrackedFiles] = useState<FigmaTrackedFile[]>([]);
+  const [syncingFile, setSyncingFile] = useState<string | null>(null);
 
   useEffect(() => {
     loadProfile();
@@ -187,6 +188,39 @@ export function SettingsPage() {
     } catch (error) {
       console.error('Error removing file:', error);
       alert('Failed to remove file. Please try again.');
+    }
+  };
+
+  const handleSyncFile = async (fileId: string) => {
+    setSyncingFile(fileId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ file_id: fileId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync comments');
+      }
+
+      const result = await response.json();
+      await loadTrackedFiles();
+      alert(`Sync complete! ${result.comments_synced} new comments synced.`);
+    } catch (error) {
+      console.error('Error syncing file:', error);
+      alert(error instanceof Error ? error.message : 'Failed to sync comments. Please try again.');
+    } finally {
+      setSyncingFile(null);
     }
   };
 
@@ -816,12 +850,23 @@ export function SettingsPage() {
                                       </p>
                                     )}
                                   </div>
-                                  <button
-                                    onClick={() => handleRemoveFile(file.id)}
-                                    className="ml-4 text-red-600 hover:text-red-700 transition-colors"
-                                  >
-                                    <XCircle size={20} />
-                                  </button>
+                                  <div className="ml-4 flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleSyncFile(file.id)}
+                                      disabled={syncingFile === file.id}
+                                      className="p-2 text-[#2563EB] hover:text-[#1d4ed8] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                                      title="Sync comments now"
+                                    >
+                                      <RefreshCw size={20} className={syncingFile === file.id ? 'animate-spin' : ''} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveFile(file.id)}
+                                      className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Remove file"
+                                    >
+                                      <XCircle size={20} />
+                                    </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
