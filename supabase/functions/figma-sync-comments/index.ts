@@ -76,8 +76,14 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
+      console.error("Auth error:", userError);
+      console.error("User:", user);
+      console.error("Auth header received:", authHeader);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({
+          error: "Unauthorized",
+          details: userError?.message || "No user found"
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
