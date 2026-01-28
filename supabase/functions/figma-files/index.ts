@@ -124,7 +124,10 @@ Deno.serve(async (req: Request) => {
 
         if (!fileResponse.ok) {
           const errorData = await fileResponse.json();
-          return new Response(JSON.stringify({ error: errorData.err || "Failed to fetch file info" }), {
+          const errorMessage = errorData.err === "Invalid token"
+            ? "Figma token is invalid or has been revoked. Please disconnect and reconnect your Figma account in Settings."
+            : errorData.err || "Failed to fetch file info";
+          return new Response(JSON.stringify({ error: errorMessage }), {
             status: fileResponse.status,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
