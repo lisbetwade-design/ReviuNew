@@ -216,6 +216,7 @@ Deno.serve(async (req: Request) => {
             status: comment.resolved_at ? "resolved" : "open",
             x_position: comment.client_meta?.x || 0,
             y_position: comment.client_meta?.y || 0,
+            source_channel: "figma",
           });
 
           totalCommentsSynced++;

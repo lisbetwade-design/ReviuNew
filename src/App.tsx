@@ -35,12 +35,12 @@ function App() {
       setLoading(false);
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAuth();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [publicToken]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
