@@ -530,74 +530,72 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Figma Connected</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-            }
-            .container {
-              text-align: center;
-              padding: 2rem;
-              background: rgba(255, 255, 255, 0.1);
-              border-radius: 1rem;
-              backdrop-filter: blur(10px);
-            }
-            h1 {
-              margin: 0 0 1rem 0;
-              font-size: 2rem;
-            }
-            p {
-              margin: 0;
-              opacity: 0.9;
-            }
-            .checkmark {
-              font-size: 4rem;
-              margin-bottom: 1rem;
-              animation: scale-in 0.3s ease-out;
-            }
-            @keyframes scale-in {
-              from { transform: scale(0); }
-              to { transform: scale(1); }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="checkmark">✓</div>
-            <h1>Successfully Connected!</h1>
-            <p>Connected as ${userData.email || userData.handle || 'Figma User'}</p>
-            <p style="margin-top: 0.5rem; font-size: 0.9rem;">This window will close automatically...</p>
-          </div>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({
-                type: 'figma-oauth-success',
-                user: {
-                  email: '${userData.email || ''}',
-                  handle: '${userData.handle || ''}',
-                  id: '${userData.id}'
-                }
-              }, '*');
-            }
-            setTimeout(() => {
-              window.close();
-            }, 2000);
-          </script>
-        </body>
-      </html>
-    `;
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<title>Figma Connected</title>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+.container {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  backdrop-filter: blur(10px);
+}
+h1 {
+  margin: 0 0 1rem 0;
+  font-size: 2rem;
+}
+p {
+  margin: 0;
+  opacity: 0.9;
+}
+.checkmark {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: scale-in 0.3s ease-out;
+}
+@keyframes scale-in {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="checkmark">&#10003;</div>
+<h1>Successfully Connected!</h1>
+<p>Connected as ${userData.email || userData.handle || 'Figma User'}</p>
+<p style="margin-top: 0.5rem; font-size: 0.9rem;">This window will close automatically...</p>
+</div>
+<script>
+if (window.opener) {
+  window.opener.postMessage({
+    type: 'figma-oauth-success',
+    user: {
+      email: '${userData.email || ''}',
+      handle: '${userData.handle || ''}',
+      id: '${userData.id}'
+    }
+  }, '*');
+}
+setTimeout(function() {
+  window.close();
+}, 2000);
+</script>
+</body>
+</html>`;
 
     return new Response(html, {
       status: 200,
