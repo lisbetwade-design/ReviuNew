@@ -94,6 +94,8 @@ Deno.serve(async (req: Request) => {
         .from("comments")
         .insert({
           design_id: designId,
+          project_id: trackedFile.project_id,
+          created_by: trackedFile.user_id,
           content: comment.message,
           author_name: comment.user?.handle || "Anonymous",
           author_email: `figma:${comment.user?.id || "unknown"}`,
