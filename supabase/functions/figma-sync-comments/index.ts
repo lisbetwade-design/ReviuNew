@@ -1,5 +1,5 @@
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://reviu-jmxo.bolt.host",
+  "Access-Control-Allow-Origin": "https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--31fc58ec.local-credentialless.webcontainer-api.io",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
