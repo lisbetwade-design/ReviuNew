@@ -7,6 +7,61 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const keyString = Deno.env.get('ENCRYPTION_KEY');
+  if (!keyString) {
+    throw new Error('ENCRYPTION_KEY environment variable not set');
+  }
+  const keyData = new TextEncoder().encode(keyString.padEnd(32, '0').substring(0, 32));
+  return await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string): Promise<string> {
+  if (!encryptedToken) return '';
+
+  try {
+    const key = await getEncryptionKey();
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+
+    return new TextDecoder().decode(decryptedData);
+  } catch (error) {
+    console.error('Token decryption failed:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
+async function encryptToken(token: string): Promise<string> {
+  const key = await getEncryptionKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encodedToken = new TextEncoder().encode(token);
+
+  const encryptedData = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encodedToken
+  );
+
+  const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encryptedData), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -23,6 +78,7 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -33,7 +89,11 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
 
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("User verification failed:", userError?.message || "No user found");
+      return new Response(JSON.stringify({
+        error: "Unauthorized",
+        details: userError?.message || "Invalid token"
+      }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -52,7 +112,7 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        const fileKeyMatch = fileUrl.match(/file\/([a-zA-Z0-9]+)/);
+        const fileKeyMatch = fileUrl.match(/(?:file|design)\/([a-zA-Z0-9]+)/);
         if (!fileKeyMatch) {
           return new Response(JSON.stringify({ error: "Invalid Figma URL" }), {
             status: 400,
@@ -64,7 +124,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: connection } = await supabaseClient
           .from("figma_connections")
-          .select("access_token")
+          .select("access_token, refresh_token, expires_at")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -75,15 +135,136 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        const fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
+        let accessToken = await decryptToken(connection.access_token);
+        const refreshToken = connection.refresh_token ? await decryptToken(connection.refresh_token) : null;
+        const expiresAt = new Date(connection.expires_at);
+        const now = new Date();
+
+        if (expiresAt <= now && refreshToken) {
+          console.log("Token expired, attempting refresh...");
+          const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+          const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+          if (clientId && clientSecret) {
+            const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                refresh_token: refreshToken,
+              }),
+            });
+
+            const refreshData = await refreshResponse.json();
+            console.log("Token refresh response:", refreshResponse.status, refreshData);
+
+            if (refreshResponse.ok && refreshData.access_token) {
+              accessToken = refreshData.access_token;
+
+              await supabaseClient
+                .from("figma_connections")
+                .update({
+                  access_token: await encryptToken(refreshData.access_token),
+                  refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : connection.refresh_token,
+                  expires_at: new Date(Date.now() + (refreshData.expires_in || 7776000) * 1000).toISOString(),
+                })
+                .eq("user_id", user.id);
+              console.log("Token refreshed successfully");
+            } else {
+              console.error("Token refresh failed:", refreshData);
+              return new Response(JSON.stringify({
+                error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
+                details: refreshData.error || "Refresh token invalid"
+              }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+        }
+
+        console.log("Attempting to fetch Figma file:", fileKey);
+        let fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
           headers: {
-            Authorization: `Bearer ${connection.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
         if (!fileResponse.ok) {
           const errorData = await fileResponse.json();
-          return new Response(JSON.stringify({ error: errorData.err || "Failed to fetch file info" }), {
+          console.error("Figma API error:", fileResponse.status, errorData);
+
+          if ((errorData.err === "Invalid token" || errorData.status === 403) && refreshToken) {
+            console.log("Token invalid, attempting refresh...");
+            const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+            const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+            if (clientId && clientSecret) {
+              const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  refresh_token: refreshToken,
+                }),
+              });
+
+              const refreshData = await refreshResponse.json();
+              console.log("Refresh response:", refreshResponse.status, refreshData);
+
+              if (refreshResponse.ok && refreshData.access_token) {
+                accessToken = refreshData.access_token;
+
+                await supabaseClient
+                  .from("figma_connections")
+                  .update({
+                    access_token: await encryptToken(refreshData.access_token),
+                    refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : connection.refresh_token,
+                    expires_at: new Date(Date.now() + (refreshData.expires_in || 7776000) * 1000).toISOString(),
+                  })
+                  .eq("user_id", user.id);
+
+                console.log("Token refreshed, retrying file fetch...");
+                fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                });
+
+                if (fileResponse.ok) {
+                  const fileData = await fileResponse.json();
+                  return new Response(JSON.stringify({
+                    file_key: fileKey,
+                    file_name: fileData.name,
+                    file_url: fileUrl,
+                  }), {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                  });
+                }
+              } else {
+                console.error("Token refresh failed:", refreshData);
+                return new Response(JSON.stringify({
+                  error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
+                  details: refreshData.error || "Refresh token invalid"
+                }), {
+                  status: 401,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+              }
+            }
+          }
+
+          const errorMessage = errorData.err === "Invalid token" || errorData.status === 403
+            ? "Figma token is invalid or has been revoked. Please disconnect and reconnect your Figma account in Settings."
+            : errorData.err || errorData.message || "Failed to fetch file info";
+          return new Response(JSON.stringify({ error: errorMessage, details: errorData }), {
             status: fileResponse.status,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });

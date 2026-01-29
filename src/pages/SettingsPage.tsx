@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Link2, Settings as SettingsIcon, Save, Key, CreditCard, CheckCircle, XCircle, Hash } from 'lucide-react';
+import { User, Link2, Settings as SettingsIcon, Save, Key, CreditCard, CheckCircle, XCircle, Hash, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { AddFigmaFileModal } from '../components/AddFigmaFileModal';
 import { supabase } from '../lib/supabase';
@@ -22,6 +22,20 @@ interface FigmaConnection {
   id: string;
   figma_user_email: string;
   created_at: string;
+}
+
+interface FigmaTrackedFile {
+  id: string;
+  file_key: string;
+  file_name: string;
+  file_url: string;
+  project_id: string;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  project?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface SlackChannel {
@@ -63,10 +77,13 @@ export function SettingsPage() {
   const [showChannelSelector, setShowChannelSelector] = useState(false);
   const [figmaConnection, setFigmaConnection] = useState<FigmaConnection | null>(null);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [trackedFiles, setTrackedFiles] = useState<FigmaTrackedFile[]>([]);
+  const [syncingFile, setSyncingFile] = useState<string | null>(null);
 
   useEffect(() => {
     loadProfile();
     loadFigmaConnection();
+    loadTrackedFiles();
   }, []);
 
   useEffect(() => {
@@ -134,17 +151,112 @@ export function SettingsPage() {
     }
   };
 
-  const handleConnectFigma = async () => {
+  const loadTrackedFiles = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const clientId = import.meta.env.VITE_FIGMA_CLIENT_ID;
-      const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-oauth-callback`;
+      const { data, error } = await supabase
+        .from('figma_tracked_files')
+        .select(`
+          *,
+          project:projects(id, name)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      const scopes = 'file_read';
+      if (error) throw error;
+      setTrackedFiles(data || []);
+    } catch (error) {
+      console.error('Error loading tracked files:', error);
+    }
+  };
 
-      const authUrl = `https://www.figma.com/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${user.id}&response_type=code`;
+  const handleRemoveFile = async (fileId: string) => {
+    if (!confirm('Are you sure you want to stop tracking this file?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('figma_tracked_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      await loadTrackedFiles();
+      alert('File removed successfully!');
+    } catch (error) {
+      console.error('Error removing file:', error);
+      alert('Failed to remove file. Please try again.');
+    }
+  };
+
+  const handleSyncFile = async (fileId: string) => {
+    setSyncingFile(fileId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ file_id: fileId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync comments');
+      }
+
+      const result = await response.json();
+      await loadTrackedFiles();
+      alert(`Sync complete! ${result.comments_synced} new comments synced.`);
+    } catch (error) {
+      console.error('Error syncing file:', error);
+      alert(error instanceof Error ? error.message : 'Failed to sync comments. Please try again.');
+    } finally {
+      setSyncingFile(null);
+    }
+  };
+
+  const handleConnectFigma = async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
+        alert('Please sign in to connect Figma.');
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-oauth-start`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OAuth start error:', response.status, errorText);
+        let errorMessage = 'Failed to start Figma OAuth';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const { authorization_url } = await response.json();
 
       const width = 600;
       const height = 700;
@@ -152,32 +264,42 @@ export function SettingsPage() {
       const top = window.screenY + (window.outerHeight - height) / 2;
 
       const popup = window.open(
-        authUrl,
+        authorization_url,
         'Figma OAuth',
         `width=${width},height=${height},left=${left},top=${top}`
       );
 
-      const pollInterval = setInterval(async () => {
-        const { data } = await supabase
-          .from('figma_connections')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (data) {
-          clearInterval(pollInterval);
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'figma-oauth-success') {
+          window.removeEventListener('message', handleMessage);
           if (popup && !popup.closed) {
             popup.close();
           }
-          setFigmaConnection(data);
+          loadFigmaConnection();
           alert('Successfully connected to Figma!');
+        } else if (event.data?.type === 'figma-oauth-error') {
+          window.removeEventListener('message', handleMessage);
+          alert(`Figma connection failed: ${event.data.error}`);
         }
-      }, 1000);
+      };
 
-      setTimeout(() => clearInterval(pollInterval), 300000);
+      window.addEventListener('message', handleMessage);
+
+      const pollInterval = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', handleMessage);
+          loadFigmaConnection();
+        }
+      }, 500);
+
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+      }, 300000);
     } catch (error) {
       console.error('Error connecting to Figma:', error);
-      alert('Failed to connect to Figma. Please try again.');
+      alert(`Failed to connect to Figma: ${error instanceof Error ? error.message : 'Please try again.'}`);
     }
   };
 
@@ -691,6 +813,70 @@ export function SettingsPage() {
                               Add File
                             </button>
                           </div>
+
+                          {trackedFiles.length > 0 ? (
+                            <div className="mt-4 space-y-3">
+                              {trackedFiles.map((file) => (
+                                <div
+                                  key={file.id}
+                                  className="flex items-start justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <a
+                                        href={file.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-medium text-gray-900 hover:text-[#2563EB] transition-colors truncate"
+                                      >
+                                        {file.file_name}
+                                      </a>
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                        file.sync_enabled
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-gray-200 text-gray-600'
+                                      }`}>
+                                        {file.sync_enabled ? 'Syncing' : 'Paused'}
+                                      </span>
+                                    </div>
+                                    {file.project && (
+                                      <p className="text-sm text-gray-600">
+                                        Project: {file.project.name}
+                                      </p>
+                                    )}
+                                    {file.last_synced_at && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Last synced: {new Date(file.last_synced_at).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="ml-4 flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleSyncFile(file.id)}
+                                      disabled={syncingFile === file.id}
+                                      className="p-2 text-[#2563EB] hover:text-[#1d4ed8] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                                      title="Sync comments now"
+                                    >
+                                      <RefreshCw size={20} className={syncingFile === file.id ? 'animate-spin' : ''} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveFile(file.id)}
+                                      className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Remove file"
+                                    >
+                                      <XCircle size={20} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-4 p-6 bg-gray-50 border border-gray-200 rounded-xl text-center">
+                              <p className="text-sm text-gray-600">
+                                No files tracked yet. Click "Add File" to get started.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : profileData.figma_token ? (
@@ -1273,6 +1459,7 @@ export function SettingsPage() {
         onClose={() => setShowAddFileModal(false)}
         onFileAdded={() => {
           loadFigmaConnection();
+          loadTrackedFiles();
         }}
       />
     </div>

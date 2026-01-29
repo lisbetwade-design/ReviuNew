@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 
 interface FeedbackItem {
   id: string;
-  design_id: string;
+  design_id: string | null;
   stakeholder_name: string;
   stakeholder_email: string | null;
   stakeholder_role: string;
@@ -101,7 +101,12 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
         .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching comments:', error);
+        throw error;
+      }
+
+      console.log('Fetched comments:', data);
 
       const mappedData = (data || []).map((comment: any) => {
         const isSlack = comment.author_email?.includes('slack.com');
