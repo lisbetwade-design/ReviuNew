@@ -8,8 +8,7 @@ const corsHeaders = {
 };
 
 interface SyncCommentsRequest {
-  fileKey: string;
-  designId: string;
+  file_id: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -42,23 +41,70 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { fileKey, designId }: SyncCommentsRequest = await req.json();
+    const { file_id }: SyncCommentsRequest = await req.json();
 
-    const { data: design, error: designError } = await supabaseClient
-      .from("designs")
-      .select("project_id, source_url")
-      .eq("id", designId)
-      .single();
+    const { data: trackedFile, error: trackedFileError } = await supabaseClient
+      .from("figma_tracked_files")
+      .select("*")
+      .eq("id", file_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (designError || !design) {
+    if (trackedFileError || !trackedFile) {
       return new Response(
-        JSON.stringify({ error: "Design not found" }),
+        JSON.stringify({ error: "Tracked file not found" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    if (!trackedFile.project_id) {
+      return new Response(
+        JSON.stringify({ error: "Tracked file must be associated with a project" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    let designId = null;
+    const { data: existingDesign } = await supabaseClient
+      .from("designs")
+      .select("id")
+      .eq("project_id", trackedFile.project_id)
+      .eq("source_url", trackedFile.file_url)
+      .maybeSingle();
+
+    if (existingDesign) {
+      designId = existingDesign.id;
+    } else {
+      const { data: newDesign, error: createError } = await supabaseClient
+        .from("designs")
+        .insert({
+          project_id: trackedFile.project_id,
+          name: trackedFile.file_name,
+          source_type: "figma",
+          source_url: trackedFile.file_url,
+        })
+        .select("id")
+        .single();
+
+      if (createError || !newDesign) {
+        return new Response(
+          JSON.stringify({ error: "Failed to create design" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      designId = newDesign.id;
+    }
+
+    const fileKey = trackedFile.file_key;
 
     const { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
