@@ -203,7 +203,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
       // Filter by page_url if provided (for embedded content with multiple pages)
       if (pageUrl.trim()) {
         // Show comments for this specific page OR comments without a page_url (legacy/general comments)
-        query = query.or(`page_url.eq."${pageUrl}",page_url.is.null`);
+        query = query.or(`page_url.eq.${pageUrl},page_url.is.null`);
       }
       // If no page URL specified, show all comments for this design
 

@@ -117,6 +117,7 @@ Deno.serve(async (req: Request) => {
           .insert({
             design_id: designId,
             project_id: design.project_id,
+            user_id: user.id,
             created_by: user.id,
             content: comment.message,
             author_name: comment.user?.handle || "Figma User",
