@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MoreVertical, MessageCircle, Sparkles, X, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, MoreVertical, MessageCircle, Sparkles, X, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Plus, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Comment {
@@ -26,6 +26,9 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
   const [showSummary, setShowSummary] = useState(false);
   const [addingToBoard, setAddingToBoard] = useState<string | null>(null);
   const [boardItems, setBoardItems] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -168,6 +171,48 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
 
   const isInBoard = (stepTitle: string) => {
     return boardItems.some(item => item.title === stepTitle);
+  };
+
+  const handleSendComment = async () => {
+    if (!newComment.trim() || !projectId) return;
+
+    setSendingComment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('You must be logged in to comment');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, email')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const { error } = await supabase
+        .from('comments')
+        .insert({
+          design_id: designId,
+          project_id: projectId,
+          created_by: user.id,
+          author_name: profile?.display_name || user.email || 'Team Member',
+          author_email: user.email || '',
+          content: newComment.trim(),
+          status: 'open',
+        });
+
+      if (error) throw error;
+
+      setNewComment('');
+      setShowCommentInput(false);
+      await loadData();
+    } catch (error) {
+      console.error('Error sending comment:', error);
+      alert('Failed to send comment. Please try again.');
+    } finally {
+      setSendingComment(false);
+    }
   };
 
   const getSourceBadge = (email: string | null) => {
@@ -418,6 +463,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
               <p className="text-sm text-gray-500">No feedback yet</p>
             </div>
           ) : (
+            <>
             <div className="space-y-4">
               {filteredComments.map((comment, idx) => {
                 const sourceBadge = getSourceBadge(comment.author_email);
@@ -485,6 +531,51 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
                 );
               })}
             </div>
+
+            {!showSummary && (
+              <div className="mt-4 border-t border-gray-200 pt-4">
+                {showCommentInput ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Add your feedback..."
+                      rows={3}
+                      autoFocus
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-sm text-gray-900 placeholder:text-gray-400"
+                    />
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setShowCommentInput(false);
+                          setNewComment('');
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSendComment}
+                        disabled={!newComment.trim() || sendingComment}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Send size={14} />
+                        {sendingComment ? 'Sending...' : 'Post'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowCommentInput(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 font-medium border border-gray-200"
+                  >
+                    <MessageCircle size={16} />
+                    Add feedback
+                  </button>
+                )}
+              </div>
+            )}
+            </>
           )}
         </div>
       )}
