@@ -214,7 +214,7 @@ export function SettingsPage() {
 
       const result = await response.json();
       await loadTrackedFiles();
-      alert(`Sync complete! ${result.comments_synced} new comments synced.`);
+      alert(`Sync complete! ${result.syncedCount || 0} new comments synced.`);
     } catch (error) {
       console.error('Error syncing file:', error);
       alert(error instanceof Error ? error.message : 'Failed to sync comments. Please try again.');

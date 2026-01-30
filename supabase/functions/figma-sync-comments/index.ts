@@ -20,33 +20,28 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("figma-sync-comments called with method:", req.method);
-    console.log("Headers:", Object.fromEntries(req.headers.entries()));
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     const authHeader = req.headers.get("Authorization");
-    console.log("Authorization header present:", !!authHeader);
 
     if (!authHeader) {
-      console.error("Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Token extracted, length:", token.length);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    console.log("User verification result:", { userId: user?.id, error: userError?.message });
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
-      console.error("User verification failed:", userError?.message || "No user found");
       return new Response(JSON.stringify({
         error: "Unauthorized",
         details: userError?.message || "Invalid token"
@@ -55,8 +50,6 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    console.log("User authenticated successfully:", user.id);
 
     const { file_id }: SyncCommentsRequest = await req.json();
 

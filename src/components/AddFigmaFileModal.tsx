@@ -67,8 +67,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
       const response = await fetch(apiUrl, {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
@@ -103,8 +102,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -121,7 +119,30 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         throw new Error(errorData.error || 'Failed to add file');
       }
 
-      alert('File added successfully! Comments will now be tracked.');
+      const result = await response.json();
+      const fileId = result.file?.id;
+
+      if (fileId) {
+        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
+        const syncResponse = await fetch(syncUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ file_id: fileId }),
+        });
+
+        if (syncResponse.ok) {
+          const syncResult = await syncResponse.json();
+          alert(`File added successfully! ${syncResult.syncedCount || 0} comments synced.`);
+        } else {
+          alert('File added successfully! Comments will be synced on the next update.');
+        }
+      } else {
+        alert('File added successfully! Comments will now be tracked.');
+      }
+
       onFileAdded();
       handleClose();
     } catch (error) {
