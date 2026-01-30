@@ -11,6 +11,61 @@ interface SyncCommentsRequest {
   file_id: string;
 }
 
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const keyString = Deno.env.get('ENCRYPTION_KEY');
+  if (!keyString) {
+    throw new Error('ENCRYPTION_KEY environment variable not set');
+  }
+  const keyData = new TextEncoder().encode(keyString.padEnd(32, '0').substring(0, 32));
+  return await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string): Promise<string> {
+  if (!encryptedToken) return '';
+
+  try {
+    const key = await getEncryptionKey();
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+
+    return new TextDecoder().decode(decryptedData);
+  } catch (error) {
+    console.error('Token decryption failed:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
+async function encryptToken(token: string): Promise<string> {
+  const key = await getEncryptionKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encodedToken = new TextEncoder().encode(token);
+
+  const encryptedData = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encodedToken
+  );
+
+  const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encryptedData), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -118,7 +173,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: figmaConnection, error: connectionError } = await supabaseClient
       .from("figma_connections")
-      .select("access_token")
+      .select("access_token, refresh_token, expires_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -132,12 +187,93 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    let accessToken = await decryptToken(figmaConnection.access_token);
+    const refreshToken = figmaConnection.refresh_token ? await decryptToken(figmaConnection.refresh_token) : null;
+    const expiresAt = new Date(figmaConnection.expires_at);
+    const now = new Date();
+
+    if (expiresAt <= now && refreshToken) {
+      const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+      const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+      if (clientId && clientSecret) {
+        const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+          }),
+        });
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.access_token) {
+            accessToken = refreshData.access_token;
+
+            await supabaseClient
+              .from("figma_connections")
+              .update({
+                access_token: await encryptToken(refreshData.access_token),
+                refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : figmaConnection.refresh_token,
+                expires_at: new Date(Date.now() + (refreshData.expires_in || 7776000) * 1000).toISOString(),
+              })
+              .eq("user_id", user.id);
+          }
+        }
+      }
+    }
+
     const commentsUrl = `https://api.figma.com/v1/files/${fileKey}/comments`;
-    const figmaResponse = await fetch(commentsUrl, {
+    let figmaResponse = await fetch(commentsUrl, {
       headers: {
-        "X-Figma-Token": figmaConnection.access_token,
+        "Authorization": `Bearer ${accessToken}`,
       },
     });
+
+    if (!figmaResponse.ok && refreshToken) {
+      const clientId = Deno.env.get("FIGMA_CLIENT_ID");
+      const clientSecret = Deno.env.get("FIGMA_CLIENT_SECRET");
+
+      if (clientId && clientSecret) {
+        const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+          }),
+        });
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.access_token) {
+            accessToken = refreshData.access_token;
+
+            await supabaseClient
+              .from("figma_connections")
+              .update({
+                access_token: await encryptToken(refreshData.access_token),
+                refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : figmaConnection.refresh_token,
+                expires_at: new Date(Date.now() + (refreshData.expires_in || 7776000) * 1000).toISOString(),
+              })
+              .eq("user_id", user.id);
+
+            figmaResponse = await fetch(commentsUrl, {
+              headers: {
+                "Authorization": `Bearer ${accessToken}`,
+              },
+            });
+          }
+        }
+      }
+    }
 
     if (!figmaResponse.ok) {
       return new Response(
