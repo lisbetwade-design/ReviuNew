@@ -91,14 +91,14 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
           created_at,
           viewed_at,
           created_by,
-          design:designs(
+          design:designs!inner(
             name,
             source_url,
             project_id,
-            project:projects(id, name)
+            project:projects!inner(id, name, user_id)
           )
         `)
-        .eq('created_by', user.id)
+        .eq('design.project.user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
