@@ -76,7 +76,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Fetch design comments (comments linked to designs)
+      const { data: designComments, error: designError } = await supabase
         .from('comments')
         .select(`
           id,
@@ -91,20 +92,50 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
           created_at,
           viewed_at,
           created_by,
-          design:designs(
+          design:designs!inner(
             name,
             source_url,
             project_id,
-            project:projects(id, name, user_id)
+            project:projects!inner(id, name, user_id)
           )
         `)
-        .or(`design.project.user_id.eq.${user.id},and(design_id.is.null,created_by.eq.${user.id})`)
-        .order('created_at', { ascending: false });
+        .eq('design.project.user_id', user.id);
 
-      if (error) {
-        console.error('Error fetching comments:', error);
-        throw error;
+      if (designError) {
+        console.error('Error fetching design comments:', designError);
+        throw designError;
       }
+
+      // Fetch standalone comments (comments not linked to designs, like Slack messages)
+      const { data: standaloneComments, error: standaloneError } = await supabase
+        .from('comments')
+        .select(`
+          id,
+          design_id,
+          author_name,
+          author_email,
+          content,
+          rating,
+          status,
+          source_channel,
+          source_channel_name,
+          created_at,
+          viewed_at,
+          created_by
+        `)
+        .is('design_id', null)
+        .eq('created_by', user.id);
+
+      if (standaloneError) {
+        console.error('Error fetching standalone comments:', standaloneError);
+        throw standaloneError;
+      }
+
+      // Combine both types of comments
+      const data = [...(designComments || []), ...(standaloneComments || [])];
+
+      // Sort by created_at descending
+      data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       console.log('Fetched comments:', data);
 
