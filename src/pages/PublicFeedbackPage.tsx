@@ -242,7 +242,6 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
     try {
       const insertData: any = {
         design_id: designs[currentDesignIndex].id,
-        stakeholder_id: stakeholder.id,
         author_name: `${stakeholder.name} ${stakeholder.surname}`,
         author_email: stakeholder.email,
         content: newComment.trim(),
