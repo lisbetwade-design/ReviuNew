@@ -106,15 +106,15 @@ Deno.serve(async (req: Request) => {
 
     const fileKey = trackedFile.file_key;
 
-    const { data: profile, error: profileError } = await supabaseClient
-      .from("profiles")
-      .select("figma_token")
-      .eq("id", user.id)
+    const { data: figmaConnection, error: connectionError } = await supabaseClient
+      .from("figma_connections")
+      .select("access_token")
+      .eq("user_id", user.id)
       .maybeSingle();
 
-    if (profileError || !profile?.figma_token) {
+    if (connectionError || !figmaConnection?.access_token) {
       return new Response(
-        JSON.stringify({ error: "Figma token not configured. Please add it in Settings." }),
+        JSON.stringify({ error: "Figma not connected. Please connect your Figma account in Settings." }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
     const commentsUrl = `https://api.figma.com/v1/files/${fileKey}/comments`;
     const figmaResponse = await fetch(commentsUrl, {
       headers: {
-        "X-Figma-Token": profile.figma_token,
+        "X-Figma-Token": figmaConnection.access_token,
       },
     });
 
@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
           .from("comments")
           .insert({
             design_id: designId,
-            project_id: design.project_id,
+            project_id: trackedFile.project_id,
             user_id: user.id,
             created_by: user.id,
             content: comment.message,
