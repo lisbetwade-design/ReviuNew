@@ -35,18 +35,39 @@ interface Project {
 }
 
 const roleColors: Record<string, string> = {
-  client: 'bg-purple-50 text-purple-600 border-purple-200',
-  pm: 'bg-blue-50 text-blue-600 border-blue-200',
-  developer: 'bg-green-50 text-green-600 border-green-200',
-  designer: 'bg-pink-50 text-pink-600 border-pink-200',
-  other: 'bg-gray-50 text-gray-600 border-gray-200',
-  'Slack User': 'bg-blue-50 text-blue-600 border-blue-200',
+  client: 'bg-gray-100 text-gray-700',
+  pm: 'bg-gray-100 text-gray-700',
+  developer: 'bg-gray-100 text-gray-700',
+  designer: 'bg-gray-100 text-gray-700',
+  other: 'bg-gray-100 text-gray-700',
+  'Slack User': 'bg-gray-100 text-gray-700',
 };
 
 const statusColors: Record<string, string> = {
-  open: 'bg-orange-50 text-orange-600 border-orange-200',
-  'under review': 'bg-yellow-50 text-yellow-600 border-yellow-200',
-  resolved: 'bg-green-50 text-green-600 border-green-200',
+  open: 'bg-gray-100 text-gray-700',
+  'under review': 'bg-gray-100 text-gray-700',
+  resolved: 'bg-gray-100 text-gray-700',
+};
+
+const getRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return `${diffInSeconds}s`;
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d`;
+  return `${Math.floor(diffInSeconds / 2592000)}mo`;
+};
+
+const getInitials = (name: string): string => {
+  return name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 };
 
 interface InboxPageProps {
@@ -334,95 +355,100 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-6xl mx-auto space-y-8">
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-5xl mx-auto">
           {Object.entries(groupedByDesign).map(([designName, items]) => (
-            <div key={designName} className="space-y-4">
-              {items[0]?.design_id ? (
-                <button
-                  onClick={() => {
-                    if (items[0]) {
-                      handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
-                    }
-                  }}
-                  className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
-                >
-                  <h2 className="font-semibold text-gray-900">{designName}</h2>
-                  <span className="text-gray-500">{items.length}</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 text-sm">
-                  <h2 className="font-semibold text-gray-900">{designName}</h2>
-                  <span className="text-gray-500">{items.length}</span>
-                </div>
-              )}
-
-              {items[0]?.design?.project?.id && (
-                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                  <FolderOpen size={14} />
+            <div key={designName} className="border-b border-gray-100">
+              <div className="bg-white px-6 py-3 border-b border-gray-100">
+                {items[0]?.design_id ? (
                   <button
-                    onClick={() => handleProjectClick(items[0].design!.project!.id)}
-                    className="hover:text-gray-700 hover:underline transition-colors"
+                    onClick={() => {
+                      if (items[0]) {
+                        handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
                   >
-                    {items[0]?.design?.project?.name}
+                    <h2 className="font-semibold text-gray-900">{designName}</h2>
+                    <span className="text-gray-500">{items.length}</span>
                   </button>
-                  <span>•</span>
-                  <span>{designName}</span>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2 text-sm">
+                    <h2 className="font-semibold text-gray-900">{designName}</h2>
+                    <span className="text-gray-500">{items.length}</span>
+                  </div>
+                )}
+              </div>
 
-              <div className="space-y-3">
-                {items.map((item) => (
+              <div>
+                {items.map((item, index) => (
                   <div
                     key={item.id}
                     onClick={() => item.design_id && handleDesignClick(item.design_id, item.id, !!item.viewed_at)}
-                    className={`border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-all ${
+                    className={`flex gap-3 px-6 py-4 hover:bg-gray-50 transition-colors ${
                       item.design_id ? 'cursor-pointer' : ''
-                    } ${
-                      item.viewed_at ? 'bg-white' : 'bg-[#F0F9FF]'
-                    }`}
+                    } ${index !== items.length - 1 ? 'border-b border-gray-100' : ''}`}
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <MessageCircle size={16} className="text-gray-600" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 mb-3">{item.content}</p>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${roleColors[item.stakeholder_role] || roleColors.other}`}>
-                            {item.stakeholder_role}
-                          </span>
-                          {item.source_channel_name && (
-                            <span className="px-2.5 py-1 rounded-md text-xs font-medium border bg-[#4A154B] text-white border-[#4A154B]">
-                              #{item.source_channel_name}
-                            </span>
-                          )}
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
-                            item.is_processed ? statusColors.resolved : statusColors.open
-                          }`}>
-                            {item.is_processed ? 'Resolved' : 'Open'}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 text-sm text-gray-500">
-                          {item.stakeholder_name}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {item.rating && (
-                          <span className="text-xl">{getRatingEmoji(item.rating)}</span>
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                        {getInitials(item.stakeholder_name)}
+                        {item.source_type === 'slack' && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
+                            <MessageCircle size={10} className="text-white" />
+                          </div>
                         )}
                       </div>
+                      {item.rating && (
+                        <span className="text-xs text-gray-600 mt-1">
+                          {item.rating}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                      {new Date(item.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        {!item.viewed_at && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1.5" />
+                        )}
+                        <span className="font-semibold text-gray-900 text-[15px]">
+                          {item.stakeholder_name}
+                        </span>
+                        <span className="text-gray-500 text-sm flex-shrink-0">
+                          {getRelativeTime(item.created_at)}
+                        </span>
+                      </div>
+
+                      <p className="text-gray-700 text-[15px] mb-2 line-clamp-2">
+                        {item.content}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!item.is_processed && (
+                          <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            + New
+                          </span>
+                        )}
+                        {item.source_channel_name && (
+                          <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            #{item.source_channel_name}
+                          </span>
+                        )}
+                        {item.design?.project?.name && (
+                          <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            {item.design.project.name}
+                          </span>
+                        )}
+                        {item.stakeholder_role && item.stakeholder_role !== 'Slack User' && (
+                          <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${roleColors[item.stakeholder_role] || roleColors.other}`}>
+                            {item.stakeholder_role}
+                          </span>
+                        )}
+                        {item.is_processed && (
+                          <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            Resolved
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
