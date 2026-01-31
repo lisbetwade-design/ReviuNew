@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Inbox, FolderOpen, MessageCircle, Snowflake, Flame, Plus } from 'lucide-react';
+import { Inbox, FolderOpen, MessageCircle } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { supabase } from '../lib/supabase';
 
@@ -65,40 +65,6 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
     if (!rating) return null;
     const emojis = ['😞', '😕', '😐', '😊', '😍'];
     return emojis[rating - 1];
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getTimeAgo = (date: string) => {
-    const now = new Date();
-    const past = new Date(date);
-    const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return 'now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d`;
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getAvatarColor = (name: string) => {
-    const colors = [
-      'bg-blue-100 text-blue-700',
-      'bg-green-100 text-green-700',
-      'bg-purple-100 text-purple-700',
-      'bg-pink-100 text-pink-700',
-      'bg-orange-100 text-orange-700',
-      'bg-cyan-100 text-cyan-700',
-    ];
-    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[index % colors.length];
   };
 
   useEffect(() => {
@@ -278,24 +244,26 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col bg-white">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">Inbox</h2>
-          <p className="text-sm text-gray-600 mt-1">Loading...</p>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-gray-500">Loading feedback...</div>
-        </div>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
 
   if (feedbackItems.length === 0) {
     return (
-      <div className="h-full flex flex-col bg-white">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">Inbox</h2>
-          <p className="text-sm text-gray-600 mt-1">0</p>
+      <div className="h-full flex flex-col">
+        <div className="bg-white p-8 border-b border-gray-200">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="relative">
+              <Inbox size={28} className="text-gray-700" />
+              {unviewedCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] rounded-full" />
+              )}
+            </div>
+            <h1 className="text-2xl font-semibold text-gray-900">Inbox</h1>
+          </div>
+          <p className="text-gray-600">View and manage all feedback across your projects.</p>
         </div>
         <EmptyState
           icon={Inbox}
@@ -307,95 +275,154 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
   }
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto">
-          {Object.entries(groupedByDesign).map(([designName, items], groupIndex) => (
-            <div key={designName}>
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
-                <h2 className="text-xl font-bold text-gray-900">{designName}</h2>
-                <p className="text-sm text-gray-600 mt-1">{items.length}</p>
-              </div>
+    <div className="h-full flex flex-col bg-[#FAFAFA]">
+      <div className="bg-white p-8 border-b border-gray-200">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="relative">
+            <Inbox size={28} className="text-gray-700" />
+            {unviewedCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] rounded-full" />
+            )}
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900">Inbox</h1>
+        </div>
+        <p className="text-gray-600">View and manage all feedback across your projects.</p>
+      </div>
 
-              <div className="divide-y divide-gray-100">
-                {items.map((item, itemIndex) => (
+      {projects.length > 0 && (
+        <div className="bg-white border-b border-gray-200 px-8">
+          <div className="flex gap-2 overflow-x-auto py-2">
+            <button
+              onClick={() => setActiveProjectId(null)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                activeProjectId === null
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span>All Projects</span>
+              <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                activeProjectId === null
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}>
+                {feedbackItems.length}
+              </span>
+            </button>
+            {projects.map((project) => (
+              <button
+                key={project.id}
+                onClick={() => setActiveProjectId(project.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                  activeProjectId === project.id
+                    ? 'bg-[#2563EB] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <FolderOpen size={16} />
+                <span>{project.name}</span>
+                <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                  activeProjectId === project.id
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {project.feedbackCount}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto p-8">
+        <div className="max-w-6xl mx-auto space-y-8">
+          {Object.entries(groupedByDesign).map(([designName, items]) => (
+            <div key={designName} className="space-y-4">
+              {items[0]?.design_id ? (
+                <button
+                  onClick={() => {
+                    if (items[0]) {
+                      handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
+                    }
+                  }}
+                  className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
+                >
+                  <h2 className="font-semibold text-gray-900">{designName}</h2>
+                  <span className="text-gray-500">{items.length}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  <h2 className="font-semibold text-gray-900">{designName}</h2>
+                  <span className="text-gray-500">{items.length}</span>
+                </div>
+              )}
+
+              {items[0]?.design?.project?.id && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <FolderOpen size={14} />
+                  <button
+                    onClick={() => handleProjectClick(items[0].design!.project!.id)}
+                    className="hover:text-gray-700 hover:underline transition-colors"
+                  >
+                    {items[0]?.design?.project?.name}
+                  </button>
+                  <span>•</span>
+                  <span>{designName}</span>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {items.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => item.design_id && handleDesignClick(item.design_id, item.id, !!item.viewed_at)}
-                    className={`px-6 py-4 hover:bg-gray-50 transition-colors ${
+                    className={`border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-all ${
                       item.design_id ? 'cursor-pointer' : ''
+                    } ${
+                      item.viewed_at ? 'bg-white' : 'bg-[#F0F9FF]'
                     }`}
                   >
                     <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 text-sm text-gray-500 w-6 text-center pt-1">
-                        {item.rating || '0'}
-                      </div>
-
-                      <div className="flex-shrink-0 relative">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold ${getAvatarColor(item.stakeholder_name)}`}>
-                          {getInitials(item.stakeholder_name)}
-                        </div>
-                        {item.source_type === 'slack' && (
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                            P
-                          </div>
-                        )}
+                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <MessageCircle size={16} className="text-gray-600" />
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {!item.viewed_at && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
-                          )}
-                          <span className="font-semibold text-gray-900">{item.stakeholder_name}</span>
-                        </div>
-
-                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.content}</p>
+                        <p className="text-gray-900 mb-3">{item.content}</p>
 
                         <div className="flex flex-wrap items-center gap-2">
-                          {item.rating && item.rating <= 2 && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-600">
-                              <Snowflake size={12} />
-                              Cold
-                            </span>
-                          )}
-                          {item.rating && item.rating >= 4 && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-600">
-                              <Flame size={12} />
-                              Hot
-                            </span>
-                          )}
-                          {!item.viewed_at && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-green-50 text-green-600">
-                              <Plus size={12} />
-                              New
-                            </span>
-                          )}
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${roleColors[item.stakeholder_role] || roleColors.other}`}>
+                            {item.stakeholder_role}
+                          </span>
                           {item.source_channel_name && (
-                            <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                              S: {item.source_channel_name}
+                            <span className="px-2.5 py-1 rounded-md text-xs font-medium border bg-[#4A154B] text-white border-[#4A154B]">
+                              #{item.source_channel_name}
                             </span>
                           )}
-                          {item.stakeholder_role && (
-                            <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                              S: {item.stakeholder_role}
-                            </span>
-                          )}
-                          {item.is_processed ? (
-                            <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                              Resolved
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                              Open
-                            </span>
-                          )}
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
+                            item.is_processed ? statusColors.resolved : statusColors.open
+                          }`}>
+                            {item.is_processed ? 'Resolved' : 'Open'}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 text-sm text-gray-500">
+                          {item.stakeholder_name}
                         </div>
                       </div>
 
-                      <div className="flex-shrink-0 text-sm text-gray-500 pt-1">
-                        {getTimeAgo(item.created_at)}
+                      <div className="flex items-center gap-3">
+                        {item.rating && (
+                          <span className="text-xl">{getRatingEmoji(item.rating)}</span>
+                        )}
                       </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                      {new Date(item.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </div>
                   </div>
                 ))}
