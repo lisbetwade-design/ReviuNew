@@ -356,7 +356,7 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
       )}
 
       <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl">
           {Object.entries(groupedByDesign).map(([designName, items]) => (
             <div key={designName} className="border-b border-gray-100">
               <div className="bg-white px-6 py-3 border-b border-gray-100">
