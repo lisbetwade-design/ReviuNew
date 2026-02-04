@@ -95,6 +95,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     const { file_key, project_id } = await req.json();
 
     if (!file_key) {
@@ -104,7 +109,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: connection } = await supabaseClient
+    const { data: connection } = await supabaseAdmin
       .from("figma_connections")
       .select("access_token, refresh_token, expires_at")
       .eq("user_id", user.id)
@@ -144,7 +149,7 @@ Deno.serve(async (req: Request) => {
         if (refreshResponse.ok && refreshData.access_token) {
           accessToken = refreshData.access_token;
 
-          await supabaseClient
+          await supabaseAdmin
             .from("figma_connections")
             .update({
               access_token: await encryptToken(refreshData.access_token),
@@ -186,7 +191,7 @@ Deno.serve(async (req: Request) => {
     const figmaData = await figmaCommentsResponse.json();
     const figmaComments = figmaData.comments || [];
 
-    const { data: existingComments } = await supabaseClient
+    const { data: existingComments } = await supabaseAdmin
       .from("comments")
       .select("id, figma_comment_id")
       .eq("source_channel", "figma")
@@ -205,7 +210,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const { error: insertError } = await supabaseClient
+      const { error: insertError } = await supabaseAdmin
         .from("comments")
         .insert({
           project_id: project_id || null,
