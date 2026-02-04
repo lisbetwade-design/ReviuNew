@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from "react";
+import { supabase } from "./src/lib/supabase";
 
 const loadSlackChannels = async () => {
   try {
-    // Dynamically fetch your JWT (replace with your actual implementation)
-    const token = await fetchJWT(); // Function to retrieve a valid JWT dynamically
-    console.log("Using JWT:", token); // Debugging token
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) {
+      throw new Error("Not authenticated - please sign in");
+    }
+
+    console.log("Using JWT from Supabase session");
 
     const response = await fetch(
-      "https://gqliajboufsrwkwezhvs.supabase.co/functions/v1/slack-channels",
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`,
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`, // Add dynamically retrieved JWT
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }
@@ -30,26 +36,6 @@ const loadSlackChannels = async () => {
     console.error("Error during API request:", error.message || "Unknown error");
     throw error;
   }
-};
-
-const fetchJWT = async (): Promise<string> => {
-  // Replace this block with the logic to fetch/generate a JWT from your backend
-  const response = await fetch("https://your-auth-api.com/generate-jwt", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      userId: "your-user-id", // Replace with your app's logic
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch JWT: " + response.status);
-  }
-
-  const data = await response.json();
-  return data.token; // Extract token from API response
 };
 
 // Main Component
