@@ -312,6 +312,20 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // Create a design record for this Figma file
+      const { data: design, error: designError } = await supabaseClient
+        .from("designs")
+        .insert({
+          project_id,
+          name: file_name,
+          source_type: "figma",
+          source_url: file_url,
+        })
+        .select()
+        .single();
+
+      if (designError) throw designError;
+
       const { data: trackedFile, error: insertError } = await supabaseClient
         .from("figma_tracked_files")
         .insert({
@@ -337,7 +351,7 @@ Deno.serve(async (req: Request) => {
           });
       }
 
-      return new Response(JSON.stringify({ success: true, file: trackedFile }), {
+      return new Response(JSON.stringify({ success: true, file: trackedFile, design }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
