@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Inbox, FolderOpen, MessageCircle } from 'lucide-react';
+import { Inbox, FolderOpen, MessageCircle, Figma } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { supabase } from '../lib/supabase';
 
@@ -189,6 +189,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
       setUnviewedCount(unviewed);
 
       const projectMap = new Map<string, { name: string; count: number }>();
+      let unassignedCount = 0;
+
       mappedData.forEach((item) => {
         if (item.design?.project?.id) {
           const projectId = item.design.project.id;
@@ -201,6 +203,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
               count: 1,
             });
           }
+        } else {
+          unassignedCount++;
         }
       });
 
@@ -209,6 +213,15 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
         name: data.name,
         feedbackCount: data.count,
       }));
+
+      // Add unassigned filter if there are standalone comments
+      if (unassignedCount > 0) {
+        projectList.push({
+          id: 'unassigned',
+          name: 'Unassigned',
+          feedbackCount: unassignedCount,
+        });
+      }
 
       setProjects(projectList);
     } catch (error) {
@@ -251,11 +264,23 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
   };
 
   const filteredFeedback = activeProjectId
-    ? feedbackItems.filter((item) => item.design?.project?.id === activeProjectId)
+    ? activeProjectId === 'unassigned'
+      ? feedbackItems.filter((item) => !item.design?.project?.id)
+      : feedbackItems.filter((item) => item.design?.project?.id === activeProjectId)
     : feedbackItems;
 
   const groupedByDesign = filteredFeedback.reduce((acc, item) => {
-    const designKey = item.design?.name || (item.source_channel_name ? `Slack: #${item.source_channel_name}` : 'Inbox Messages');
+    let designKey: string;
+    if (item.design?.name) {
+      designKey = item.design.name;
+    } else if (item.source_type === 'figma') {
+      designKey = 'Figma Comments';
+    } else if (item.source_channel_name) {
+      designKey = `Slack: #${item.source_channel_name}`;
+    } else {
+      designKey = 'Inbox Messages';
+    }
+
     if (!acc[designKey]) {
       acc[designKey] = [];
     }
@@ -340,7 +365,11 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <FolderOpen size={16} />
+                {project.id === 'unassigned' ? (
+                  <Inbox size={16} />
+                ) : (
+                  <FolderOpen size={16} />
+                )}
                 <span>{project.name}</span>
                 <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
                   activeProjectId === project.id
@@ -357,28 +386,34 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
 
       <div className="flex-1 overflow-auto">
         <div className="max-w-5xl">
-          {Object.entries(groupedByDesign).map(([designName, items]) => (
-            <div key={designName} className="border-b border-gray-100">
-              <div className="bg-white px-6 py-3 border-b border-gray-100">
-                {items[0]?.design_id ? (
-                  <button
-                    onClick={() => {
-                      if (items[0]) {
-                        handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
-                      }
-                    }}
-                    className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
-                  >
-                    <h2 className="font-semibold text-gray-900">{designName}</h2>
-                    <span className="text-gray-500">{items.length}</span>
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm">
-                    <h2 className="font-semibold text-gray-900">{designName}</h2>
-                    <span className="text-gray-500">{items.length}</span>
-                  </div>
-                )}
-              </div>
+          {Object.entries(groupedByDesign).map(([designName, items]) => {
+            const isFigmaGroup = designName === 'Figma Comments';
+            const isSlackGroup = designName.startsWith('Slack:');
+
+            return (
+              <div key={designName} className="border-b border-gray-100">
+                <div className="bg-white px-6 py-3 border-b border-gray-100">
+                  {items[0]?.design_id ? (
+                    <button
+                      onClick={() => {
+                        if (items[0]) {
+                          handleDesignClick(items[0].design_id, items[0].id, !!items[0].viewed_at);
+                        }
+                      }}
+                      className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
+                    >
+                      <h2 className="font-semibold text-gray-900">{designName}</h2>
+                      <span className="text-gray-500">{items.length}</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm">
+                      {isFigmaGroup && <Figma size={16} className="text-purple-500" />}
+                      {isSlackGroup && <MessageCircle size={16} className="text-orange-500" />}
+                      <h2 className="font-semibold text-gray-900">{designName}</h2>
+                      <span className="text-gray-500">{items.length}</span>
+                    </div>
+                  )}
+                </div>
 
               <div>
                 {items.map((item, index) => (
@@ -395,6 +430,11 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
                         {item.source_type === 'slack' && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
                             <MessageCircle size={10} className="text-white" />
+                          </div>
+                        )}
+                        {item.source_type === 'figma' && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                            <Figma size={10} className="text-white" />
                           </div>
                         )}
                       </div>
@@ -454,7 +494,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
