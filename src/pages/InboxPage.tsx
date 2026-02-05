@@ -161,8 +161,8 @@ export function InboxPage({ onNavigateToDesign, onNavigateToProject }: InboxPage
       console.log('Fetched comments:', data);
 
       const mappedData = (data || []).map((comment: any) => {
-        const isSlack = comment.author_email?.includes('slack.com');
-        const isFigma = comment.author_email?.includes('figma');
+        const isSlack = comment.source_channel === 'slack' || comment.author_email?.includes('slack.com');
+        const isFigma = comment.source_channel === 'figma' || comment.author_email?.includes('figma');
 
         return {
           id: comment.id,
