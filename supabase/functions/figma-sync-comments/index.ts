@@ -24,19 +24,19 @@ async function getEncryptionKey(): Promise<CryptoKey> {
 
 async function decryptToken(encryptedToken: string): Promise<string> {
   if (!encryptedToken) return '';
-
+  
   try {
     const key = await getEncryptionKey();
     const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
     const iv = combined.slice(0, 12);
     const encryptedData = combined.slice(12);
-
+    
     const decryptedData = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       key,
       encryptedData
     );
-
+    
     return new TextDecoder().decode(decryptedData);
   } catch (error) {
     console.error('Token decryption failed:', error);
@@ -48,17 +48,17 @@ async function encryptToken(token: string): Promise<string> {
   const key = await getEncryptionKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encodedToken = new TextEncoder().encode(token);
-
+  
   const encryptedData = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     key,
     encodedToken
   );
-
+  
   const combined = new Uint8Array(iv.length + encryptedData.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(encryptedData), iv.length);
-
+  
   return btoa(String.fromCharCode(...combined));
 }
 
@@ -79,36 +79,38 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
+    // Create client for user authentication (validates user JWT)
     const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseAnonKey,
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
-        global: { headers: { Authorization: authHeader } },
-      }
-    );
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (!user || userError) {
-      return new Response(JSON.stringify({ error: "Invalid token or user not authenticated" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      supabaseServiceKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
+        global: {
+          headers: { Authorization: authHeader },
         },
       }
     );
+
+    // Create admin client for database operations (uses service role)
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    // Verify user authentication
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid JWT" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { file_key, project_id } = await req.json();
 
@@ -119,14 +121,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: connection } = await supabaseAdmin
+    // Use admin client for database queries
+    const { data: connection, error: connectionError } = await supabaseAdmin
       .from("figma_connections")
       .select("access_token, refresh_token, expires_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!connection) {
-      return new Response(JSON.stringify({ error: "Figma not connected. Please connect your Figma account in Settings." }), {
+    if (connectionError || !connection) {
+      return new Response(JSON.stringify({ error: "Figma not connected" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -154,23 +157,20 @@ Deno.serve(async (req: Request) => {
           }),
         });
 
-        const refreshData = await refreshResponse.json();
-
-        if (refreshResponse.ok && refreshData.access_token) {
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
           accessToken = refreshData.access_token;
 
           await supabaseAdmin
             .from("figma_connections")
             .update({
               access_token: await encryptToken(refreshData.access_token),
-              refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : connection.refresh_token,
-              expires_at: new Date(Date.now() + (refreshData.expires_in || 7776000) * 1000).toISOString(),
+              refresh_token: refreshData.refresh_token ? await encryptToken(refreshData.refresh_token) : null,
+              expires_at: new Date(Date.now() + (refreshData.expires_in * 1000)),
             })
             .eq("user_id", user.id);
         } else {
-          return new Response(JSON.stringify({
-            error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
-          }), {
+          return new Response(JSON.stringify({ error: "Figma authentication expired. Please reconnect." }), {
             status: 401,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -182,17 +182,14 @@ Deno.serve(async (req: Request) => {
       `https://api.figma.com/v1/files/${file_key}/comments`,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          "Authorization": `Bearer ${accessToken}`,
         },
       }
     );
 
     if (!figmaCommentsResponse.ok) {
-      const errorData = await figmaCommentsResponse.json();
-      return new Response(JSON.stringify({
-        error: "Failed to fetch comments from Figma",
-        details: errorData
-      }), {
+      const errorText = await figmaCommentsResponse.text();
+      return new Response(JSON.stringify({ error: "Failed to fetch Figma comments", details: errorText }), {
         status: figmaCommentsResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -230,30 +227,27 @@ Deno.serve(async (req: Request) => {
           position_y: comment.client_meta?.y || 0,
           source_channel: "figma",
           figma_comment_id: comment.id,
+          user_id: user.id,
         });
 
-      if (insertError) {
-        console.error("Error inserting comment:", insertError);
-      } else {
+      if (!insertError) {
         addedCount++;
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Sync completed successfully",
-        summary: {
-          added: addedCount,
-          skipped: skippedCount,
-          total: figmaComments.length,
-        },
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Sync completed successfully",
+      summary: {
+        added: addedCount,
+        skipped: skippedCount,
+        total: figmaComments.length,
+      },
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   } catch (error) {
     console.error("Error syncing comments:", error);
     return new Response(JSON.stringify({
