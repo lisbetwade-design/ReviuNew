@@ -120,10 +120,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { file_key, project_id } = await req.json();
+    const body = await req.json();
+    console.log("Received request body:", body);
+
+    const { file_key, project_id } = body;
 
     if (!file_key) {
-      return new Response(JSON.stringify({ error: "Missing file_key" }), {
+      console.error("Missing file_key in body:", body);
+      return new Response(JSON.stringify({
+        error: "Missing file_key",
+        received: body
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
