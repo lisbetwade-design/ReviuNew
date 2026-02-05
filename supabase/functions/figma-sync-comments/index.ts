@@ -258,6 +258,16 @@ Deno.serve(async (req: Request) => {
     const figmaData = await figmaCommentsResponse.json();
     const figmaComments = figmaData.comments || [];
 
+    // Find the design associated with this file_key
+    const { data: design } = await supabaseAdmin
+      .from("designs")
+      .select("id")
+      .eq("source_type", "figma")
+      .ilike("source_url", `%${file_key}%`)
+      .maybeSingle();
+
+    const design_id = design?.id || null;
+
     const { data: existingComments } = await supabaseAdmin
       .from("comments")
       .select("id, figma_comment_id")
@@ -280,6 +290,7 @@ Deno.serve(async (req: Request) => {
       const { error: insertError } = await supabaseAdmin
         .from("comments")
         .insert({
+          design_id: design_id,
           project_id: project_id || null,
           author_name: comment.user?.handle || "Figma User",
           author_email: comment.user?.email || "figma@figma.com",
