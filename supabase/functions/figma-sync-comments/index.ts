@@ -218,6 +218,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    console.log(`Fetching comments for file_key: ${file_key}`);
+
     const figmaCommentsResponse = await fetch(
       `https://api.figma.com/v1/files/${file_key}/comments`,
       {
@@ -229,7 +231,25 @@ Deno.serve(async (req: Request) => {
 
     if (!figmaCommentsResponse.ok) {
       const errorText = await figmaCommentsResponse.text();
-      return new Response(JSON.stringify({ error: "Failed to fetch Figma comments", details: errorText }), {
+      console.error("Figma API error:", {
+        status: figmaCommentsResponse.status,
+        statusText: figmaCommentsResponse.statusText,
+        body: errorText,
+        file_key
+      });
+
+      let errorMessage = "Failed to fetch Figma comments";
+      if (figmaCommentsResponse.status === 403) {
+        errorMessage = "Access denied. Please check that you have permission to access this Figma file and that your connection is still valid.";
+      } else if (figmaCommentsResponse.status === 404) {
+        errorMessage = "Figma file not found. The file may have been deleted or the URL is incorrect.";
+      }
+
+      return new Response(JSON.stringify({
+        error: errorMessage,
+        details: errorText,
+        status: figmaCommentsResponse.status
+      }), {
         status: figmaCommentsResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
