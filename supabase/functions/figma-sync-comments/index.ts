@@ -104,9 +104,17 @@ Deno.serve(async (req: Request) => {
 
     // Verify user authentication
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
+
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid JWT" }), {
+      console.error("JWT verification failed:", {
+        userError: userError?.message,
+        hasUser: !!user,
+        authHeader: authHeader.substring(0, 20) + "..."
+      });
+      return new Response(JSON.stringify({
+        error: "Invalid JWT",
+        details: userError?.message || "No user found"
+      }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
