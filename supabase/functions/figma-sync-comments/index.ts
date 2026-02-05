@@ -123,12 +123,37 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     console.log("Received request body:", body);
 
-    const { file_key, project_id } = body;
+    let { file_key, project_id } = body;
+    const { file_id } = body;
+
+    if (file_id && !file_key) {
+      const { data: fileRecord, error: lookupError } = await supabaseAdmin
+        .from('figma_tracked_files')
+        .select('file_key, project_id')
+        .eq('id', file_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (lookupError || !fileRecord) {
+        return new Response(JSON.stringify({
+          error: "File not found",
+          file_id
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      file_key = fileRecord.file_key;
+      if (!project_id) {
+        project_id = fileRecord.project_id;
+      }
+    }
 
     if (!file_key) {
       console.error("Missing file_key in body:", body);
       return new Response(JSON.stringify({
-        error: "Missing file_key",
+        error: "Missing file_key or file_id",
         received: body
       }), {
         status: 400,
@@ -251,9 +276,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    await supabaseAdmin
+      .from('figma_tracked_files')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('file_key', file_key)
+      .eq('user_id', user.id);
+
     return new Response(JSON.stringify({
       success: true,
       message: "Sync completed successfully",
+      syncedCount: addedCount,
       summary: {
         added: addedCount,
         skipped: skippedCount,
