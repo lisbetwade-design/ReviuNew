@@ -222,12 +222,13 @@ Deno.serve(async (req: Request) => {
         .insert({
           project_id: project_id || null,
           author_name: comment.user?.handle || "Figma User",
+          author_email: comment.user?.email || "figma@figma.com",
           content: comment.message,
           position_x: comment.client_meta?.x || 0,
           position_y: comment.client_meta?.y || 0,
           source_channel: "figma",
           figma_comment_id: comment.id,
-          user_id: user.id,
+          created_by: user.id,
         });
 
       if (!insertError) {

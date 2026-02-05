@@ -120,27 +120,27 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
       }
 
       const result = await response.json();
-      const fileId = result.file?.id;
 
-      if (fileId) {
-        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
-        const syncResponse = await fetch(syncUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ file_id: fileId }),
-        });
+      const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
+      const syncResponse = await fetch(syncUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_key: fileInfo.file_key,
+          project_id: selectedProject,
+        }),
+      });
 
-        if (syncResponse.ok) {
-          const syncResult = await syncResponse.json();
-          alert(`File added successfully! ${syncResult.syncedCount || 0} comments synced.`);
-        } else {
-          alert('File added successfully! Comments will be synced on the next update.');
-        }
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        alert(`File added successfully! ${syncResult.summary?.added || 0} comments synced.`);
       } else {
-        alert('File added successfully! Comments will now be tracked.');
+        const errorData = await syncResponse.json();
+        console.error('Sync error:', errorData);
+        alert('File added but failed to sync comments. Please try syncing manually.');
       }
 
       onFileAdded();
