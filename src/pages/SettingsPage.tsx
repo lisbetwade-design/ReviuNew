@@ -1354,96 +1354,61 @@ export function SettingsPage() {
               {activeTab === 'subscription' && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Subscription Plan</h3>
-                    <p className="text-sm text-gray-600 mb-6">
-                      Manage your subscription and billing settings.
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Subscription</h3>
+                    <p className="text-sm text-gray-600 mb-8">
+                      Manage your plan and billing settings
                     </p>
 
-                    <div className="bg-gradient-to-br from-[#2563EB] to-[#1d4ed8] rounded-2xl p-6 text-white mb-6">
-                      <div className="flex items-start justify-between mb-4">
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6">
+                      <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="text-2xl font-bold mb-1">Free Plan</h4>
-                          <p className="text-blue-100 text-sm">Currently active</p>
-                        </div>
-                        <div className="bg-white/20 px-4 py-2 rounded-lg">
-                          <p className="text-2xl font-bold">$0</p>
-                          <p className="text-xs text-blue-100">per month</p>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-1">Free trial</h4>
+                          <span className="inline-flex items-center px-2.5 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg">
+                            Currently active
+                          </span>
                         </div>
                       </div>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-                          Up to 3 projects
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-                          Unlimited designs
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-                          Basic feedback management
-                        </li>
-                      </ul>
+                      <p className="text-sm text-gray-600">14 days remaining</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="border-2 border-gray-200 rounded-2xl p-6 hover:border-[#2563EB] transition-colors">
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Pro Plan</h4>
-                        <div className="mb-4">
-                          <span className="text-3xl font-bold text-gray-900">$29</span>
-                          <span className="text-gray-600 ml-2">per month</span>
-                        </div>
-                        <ul className="space-y-2 text-sm text-gray-600 mb-6">
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Unlimited projects
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Advanced analytics
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Priority support
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Custom branding
-                          </li>
-                        </ul>
-                        <button className="w-full py-2.5 border-2 border-[#2563EB] text-[#2563EB] rounded-xl font-medium hover:bg-[#2563EB] hover:text-white transition-colors">
-                          Upgrade to Pro
-                        </button>
+                    <div className="bg-white border-2 border-[#2563EB] rounded-2xl p-8 shadow-sm">
+                      <h4 className="text-2xl font-bold text-gray-900 mb-1">Pro — for individuals</h4>
+                      <div className="mb-6">
+                        <span className="text-4xl font-bold text-gray-900">€15</span>
+                        <span className="text-gray-600 ml-2">/ month</span>
                       </div>
+                      <p className="text-sm text-gray-600 mb-6">After your free trial ends</p>
 
-                      <div className="border-2 border-gray-200 rounded-2xl p-6 hover:border-[#2563EB] transition-colors">
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Team Plan</h4>
-                        <div className="mb-4">
-                          <span className="text-3xl font-bold text-gray-900">$99</span>
-                          <span className="text-gray-600 ml-2">per month</span>
-                        </div>
-                        <ul className="space-y-2 text-sm text-gray-600 mb-6">
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Everything in Pro
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Up to 10 team members
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Advanced permissions
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
-                            Dedicated support
-                          </li>
-                        </ul>
-                        <button className="w-full py-2.5 border-2 border-[#2563EB] text-[#2563EB] rounded-xl font-medium hover:bg-[#2563EB] hover:text-white transition-colors">
-                          Upgrade to Team
-                        </button>
-                      </div>
+                      <ul className="space-y-4 mb-8 text-gray-700">
+                        <li className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <span>Collect feedback from all your tools in one place</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <span>Instantly spot recurring issues and patterns</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <span>AI-powered insights to guide product decisions</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <span>A personal dashboard built for solo work</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <span>Priority support</span>
+                        </li>
+                      </ul>
+
+                      <button className="w-full py-4 bg-[#2563EB] text-white rounded-xl font-semibold hover:bg-[#1d4ed8] transition-all shadow-sm hover:shadow-md mb-4">
+                        Continue with Pro
+                      </button>
+
+                      <p className="text-center text-sm text-gray-500">
+                        Cancel anytime · No questions asked
+                      </p>
                     </div>
                   </div>
                 </div>
