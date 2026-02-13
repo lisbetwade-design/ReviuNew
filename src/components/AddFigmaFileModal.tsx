@@ -87,8 +87,10 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
 
     setFetchingFile(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error('Not authenticated. Please refresh the page and try again.');
+      }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
       console.log('Fetching file info from:', apiUrl);
@@ -96,6 +98,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       });
 
@@ -106,7 +109,14 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         try {
           const errorData = await response.json();
           console.error('Error data:', errorData);
-          errorMessage = errorData.error || errorData.details || errorMessage;
+
+          if (errorData.error === 'Figma not connected') {
+            errorMessage = 'Please connect your Figma account in Settings first.';
+          } else if (errorData.error?.includes('Invalid JWT') || errorData.error?.includes('Unauthorized')) {
+            errorMessage = 'Session expired. Please refresh the page and try again.';
+          } else {
+            errorMessage = errorData.error || errorData.details || errorMessage;
+          }
         } catch (parseError) {
           console.error('Failed to parse error response:', parseError);
           errorMessage = `Server returned ${response.status}: ${response.statusText}`;
@@ -134,14 +144,17 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error('Not authenticated. Please refresh the page and try again.');
+      }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -165,6 +178,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
