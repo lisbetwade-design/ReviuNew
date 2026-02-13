@@ -462,18 +462,40 @@ Deno.serve(async (req: Request) => {
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expires_in || 7776000));
 
-    const { error: upsertError } = await serviceClient
+    const { data: existingConnection } = await serviceClient
       .from("figma_connections")
-      .upsert({
-        user_id: pkceData.user_id,
-        access_token: encryptedAccessToken,
-        refresh_token: encryptedRefreshToken,
-        expires_at: expiresAt.toISOString(),
-        figma_user_id: userData.id,
-        figma_user_email: userData.email,
-      }, {
-        onConflict: 'user_id'
-      });
+      .select("*")
+      .eq("user_id", pkceData.user_id)
+      .maybeSingle();
+
+    let upsertError = null;
+
+    if (existingConnection) {
+      const { error } = await serviceClient
+        .from("figma_connections")
+        .update({
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
+          expires_at: expiresAt.toISOString(),
+          figma_user_id: userData.id,
+          figma_user_email: userData.email,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", pkceData.user_id);
+      upsertError = error;
+    } else {
+      const { error } = await serviceClient
+        .from("figma_connections")
+        .insert({
+          user_id: pkceData.user_id,
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
+          expires_at: expiresAt.toISOString(),
+          figma_user_id: userData.id,
+          figma_user_email: userData.email,
+        });
+      upsertError = error;
+    }
 
     await serviceClient
       .from("oauth_pkce_state")

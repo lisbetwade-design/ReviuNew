@@ -178,8 +178,9 @@ Deno.serve(async (req: Request) => {
             } else {
               console.error("Token refresh failed:", refreshData);
               return new Response(JSON.stringify({
-                error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
-                details: refreshData.error || "Refresh token invalid"
+                error: "Figma authentication has expired. Please go to Settings > Integrations and click 'Reconnect' under Figma Integration to refresh your connection.",
+                details: refreshData.error || "Refresh token invalid",
+                action: "reconnect"
               }), {
                 status: 401,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -253,8 +254,9 @@ Deno.serve(async (req: Request) => {
               } else {
                 console.error("Token refresh failed:", refreshData);
                 return new Response(JSON.stringify({
-                  error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
-                  details: refreshData.error || "Refresh token invalid"
+                  error: "Figma authentication has expired. Please go to Settings > Integrations and click 'Reconnect' under Figma Integration to refresh your connection.",
+                  details: refreshData.error || "Refresh token invalid",
+                  action: "reconnect"
                 }), {
                   status: 401,
                   headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -264,9 +266,13 @@ Deno.serve(async (req: Request) => {
           }
 
           const errorMessage = errorData.err === "Invalid token" || errorData.status === 403
-            ? "Figma token is invalid or has been revoked. Please disconnect and reconnect your Figma account in Settings."
+            ? "Figma token is invalid. Please go to Settings > Integrations and click 'Reconnect' under Figma Integration, or check that you have access to this file."
             : errorData.err || errorData.message || "Failed to fetch file info";
-          return new Response(JSON.stringify({ error: errorMessage, details: errorData }), {
+          return new Response(JSON.stringify({
+            error: errorMessage,
+            details: errorData,
+            action: (errorData.err === "Invalid token" || errorData.status === 403) ? "reconnect" : undefined
+          }), {
             status: fileResponse.status,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });

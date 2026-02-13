@@ -223,7 +223,14 @@ export function SettingsPage() {
     }
   };
 
-  const handleConnectFigma = async () => {
+  const handleConnectFigma = async (isReconnect = false) => {
+    if (isReconnect && figmaConnection) {
+      const confirmMessage = 'Reconnecting will update your Figma connection. Your existing tracked files will continue to work. Continue?';
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+    }
+
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) {
@@ -783,14 +790,25 @@ export function SettingsPage() {
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={handleDisconnectFigma}
-                              disabled={saving}
-                              className="flex items-center gap-2 px-4 py-2 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              <XCircle size={18} />
-                              Disconnect
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleConnectFigma(true)}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-4 py-2 border-2 border-blue-200 text-blue-600 rounded-xl font-medium hover:bg-blue-50 transition-colors disabled:opacity-50"
+                                title="Reconnect if you're experiencing issues"
+                              >
+                                <RefreshCw size={18} />
+                                Reconnect
+                              </button>
+                              <button
+                                onClick={handleDisconnectFigma}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-4 py-2 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <XCircle size={18} />
+                                Disconnect
+                              </button>
+                            </div>
                           </div>
                         </div>
 
