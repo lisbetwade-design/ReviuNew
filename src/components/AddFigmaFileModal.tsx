@@ -20,6 +20,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   const [loading, setLoading] = useState(false);
   const [fetchingFile, setFetchingFile] = useState(false);
   const [fileInfo, setFileInfo] = useState<{ file_key: string; file_name: string; file_url: string } | null>(null);
+  const [hasFigmaConnection, setHasFigmaConnection] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState({
     sync_all_comments: true,
     sync_only_mentions: false,
@@ -29,6 +30,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   useEffect(() => {
     if (isOpen) {
       loadProjects();
+      checkFigmaConnection();
     }
   }, [isOpen]);
 
@@ -53,6 +55,30 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
     }
   };
 
+  const checkFigmaConnection = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('figma_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking Figma connection:', error);
+        setHasFigmaConnection(false);
+        return;
+      }
+
+      setHasFigmaConnection(!!data);
+    } catch (error) {
+      console.error('Error checking Figma connection:', error);
+      setHasFigmaConnection(false);
+    }
+  };
+
   const handleFetchFileInfo = async () => {
     if (!fileUrl.trim()) {
       alert('Please enter a Figma file URL');
@@ -65,18 +91,31 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
       if (!session) throw new Error('Not authenticated');
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
+      console.log('Fetching file info from:', apiUrl);
+
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch file info');
+        let errorMessage = 'Failed to fetch file info';
+        try {
+          const errorData = await response.json();
+          console.error('Error data:', errorData);
+          errorMessage = errorData.error || errorData.details || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          errorMessage = `Server returned ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('File info retrieved:', data);
       setFileInfo(data);
     } catch (error) {
       console.error('Error fetching file info:', error);
@@ -180,6 +219,17 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         </div>
 
         <div className="p-6 space-y-6">
+          {hasFigmaConnection === false && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <p className="text-sm text-yellow-800 font-medium mb-2">Figma Not Connected</p>
+              <p className="text-sm text-yellow-700">
+                You need to connect your Figma account first. Go to{' '}
+                <a href="/settings" className="underline font-medium">Settings</a> and click
+                "Connect Figma" to authorize access to your Figma files.
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Figma File URL
@@ -191,11 +241,11 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
                 onChange={(e) => setFileUrl(e.target.value)}
                 placeholder="https://www.figma.com/file/..."
                 className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                disabled={fetchingFile}
+                disabled={fetchingFile || hasFigmaConnection === false}
               />
               <button
                 onClick={handleFetchFileInfo}
-                disabled={fetchingFile || !fileUrl.trim()}
+                disabled={fetchingFile || !fileUrl.trim() || hasFigmaConnection === false}
                 className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {fetchingFile ? (
