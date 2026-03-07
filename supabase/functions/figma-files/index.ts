@@ -79,12 +79,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
         global: {
-          headers: { Authorization: authHeader },
+          headers: { Authorization: `Bearer ${token}` },
         },
       }
     );
@@ -93,13 +95,20 @@ Deno.serve(async (req: Request) => {
 
     if (userError) {
       console.error("Auth error:", userError);
+      return new Response(JSON.stringify({
+        error: "Unauthorized",
+        details: userError.message || "Failed to authenticate"
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!user) {
       console.error("No user found in token");
       return new Response(JSON.stringify({
         error: "Unauthorized",
-        details: userError?.message || "Invalid or expired token. Please try refreshing the page."
+        details: "Invalid or expired token. Please try refreshing the page."
       }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
