@@ -250,7 +250,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
               <p className="text-sm text-yellow-700">
                 You need to connect your Figma account first. Go to{' '}
                 <a href="/settings" className="underline font-medium">Settings</a> and click
-                "Connect Figma" to authorize access to your Figma files.
+                "Connect Figma\" to authorize access to your Figma files.
               </p>
             </div>
           )}
