@@ -88,8 +88,13 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
     setFetchingFile(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error('Not authenticated. Please refresh the page and try again.');
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get session. Please try refreshing the page.');
+      }
+
+      if (!session) {
+        throw new Error('Not authenticated. Please sign in again.');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
@@ -106,21 +111,27 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
 
       if (!response.ok) {
         let errorMessage = 'Failed to fetch file info';
-        try {
-          const errorData = await response.json();
-          console.error('Error data:', errorData);
+        let errorData: any = {};
 
-          if (errorData.error === 'Figma not connected') {
-            errorMessage = 'Please connect your Figma account in Settings first.';
-          } else if (errorData.error?.includes('Invalid JWT') || errorData.error?.includes('Unauthorized')) {
-            errorMessage = 'Session expired. Please refresh the page and try again.';
-          } else {
-            errorMessage = errorData.error || errorData.details || errorMessage;
-          }
+        try {
+          errorData = await response.json();
+          console.error('Error data:', errorData);
         } catch (parseError) {
           console.error('Failed to parse error response:', parseError);
-          errorMessage = `Server returned ${response.status}: ${response.statusText}`;
         }
+
+        if (errorData.error === 'Figma not connected') {
+          errorMessage = 'Please connect your Figma account in Settings first.';
+        } else if (response.status === 401) {
+          errorMessage = 'Your session has expired. Please sign in again.';
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.details) {
+          errorMessage = errorData.details;
+        } else {
+          errorMessage = `Server error (${response.status}): ${response.statusText}`;
+        }
+
         throw new Error(errorMessage);
       }
 
