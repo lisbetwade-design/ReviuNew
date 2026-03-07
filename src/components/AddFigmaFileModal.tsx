@@ -97,6 +97,9 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         throw new Error('Not authenticated. Please sign in again.');
       }
 
+      console.log('Auth token available:', session.access_token ? 'yes' : 'no');
+      console.log('Token preview:', session.access_token.substring(0, 20) + '...');
+
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
       console.log('Fetching file info from:', apiUrl);
 
@@ -104,6 +107,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
         },
       });
 
@@ -123,7 +127,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         if (errorData.error === 'Figma not connected') {
           errorMessage = 'Please connect your Figma account in Settings first.';
         } else if (response.status === 401) {
-          errorMessage = 'Your session has expired. Please sign in again.';
+          errorMessage = errorData.details || 'Your session has expired. Please refresh the page and try again.';
         } else if (errorData.error) {
           errorMessage = errorData.error;
         } else if (errorData.details) {

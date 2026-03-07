@@ -91,10 +91,15 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-    if (userError || !user) {
+    if (userError) {
+      console.error("Auth error:", userError);
+    }
+
+    if (!user) {
+      console.error("No user found in token");
       return new Response(JSON.stringify({
         error: "Unauthorized",
-        details: userError?.message || "Invalid token"
+        details: userError?.message || "Invalid or expired token. Please try refreshing the page."
       }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
