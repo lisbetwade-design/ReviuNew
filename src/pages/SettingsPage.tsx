@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { User, Link2, Settings as SettingsIcon, Save, Key, CreditCard, CheckCircle, XCircle, Hash, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { AddFigmaFileModal } from '../components/AddFigmaFileModal';
-import { supabase } from '../lib/supabase';
+import { supabase, getValidSession } from '../lib/supabase';
 
 type Tab = 'profile' | 'integrations' | 'settings' | 'subscription';
 
@@ -79,6 +79,7 @@ export function SettingsPage() {
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [trackedFiles, setTrackedFiles] = useState<FigmaTrackedFile[]>([]);
   const [syncingFile, setSyncingFile] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     loadProfile();
@@ -193,9 +194,9 @@ export function SettingsPage() {
 
   const handleSyncFile = async (fileId: string) => {
     setSyncingFile(fileId);
+    setNotification(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
       const response = await fetch(apiUrl, {
@@ -210,15 +211,21 @@ export function SettingsPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        if (errorData.error === 'figma_disconnected') {
+          await loadFigmaConnection();
+          await loadTrackedFiles();
+          setNotification({ type: 'error', message: 'Your Figma connection expired and has been removed. Please reconnect.' });
+          return;
+        }
         throw new Error(errorData.error || 'Failed to sync comments');
       }
 
       const result = await response.json();
       await loadTrackedFiles();
-      alert(`Sync complete! ${result.syncedCount || 0} new comments synced.`);
+      setNotification({ type: 'success', message: `Sync complete — ${result.syncedCount || 0} new comments added.` });
     } catch (error) {
       console.error('Error syncing file:', error);
-      alert(error instanceof Error ? error.message : 'Failed to sync comments. Please try again.');
+      setNotification({ type: 'error', message: error instanceof Error ? error.message : 'Failed to sync comments. Please try again.' });
     } finally {
       setSyncingFile(null);
     }
@@ -226,12 +233,7 @@ export function SettingsPage() {
 
   const handleConnectFigma = async () => {
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        console.error('Session error:', sessionError);
-        alert('Please sign in to connect Figma.');
-        return;
-      }
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-oauth-start`;
       const response = await fetch(apiUrl, {
@@ -269,37 +271,50 @@ export function SettingsPage() {
         `width=${width},height=${height},left=${left},top=${top}`
       );
 
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const cleanup = () => {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+      };
+
       const handleMessage = (event: MessageEvent) => {
         if (event.data?.type === 'figma-oauth-success') {
-          window.removeEventListener('message', handleMessage);
-          if (popup && !popup.closed) {
-            popup.close();
-          }
+          cleanup();
+          if (popup && !popup.closed) popup.close();
           loadFigmaConnection();
-          alert('Successfully connected to Figma!');
         } else if (event.data?.type === 'figma-oauth-error') {
-          window.removeEventListener('message', handleMessage);
-          alert(`Figma connection failed: ${event.data.error}`);
+          cleanup();
+          setNotification({ type: 'error', message: `Figma connection failed: ${event.data.error}` });
         }
       };
 
       window.addEventListener('message', handleMessage);
 
+      // Poll the DB directly — postMessage is often blocked across origins
       const pollInterval = setInterval(async () => {
         if (popup?.closed) {
-          clearInterval(pollInterval);
-          window.removeEventListener('message', handleMessage);
+          cleanup();
+          loadFigmaConnection();
+          return;
+        }
+        if (!user) return;
+        const { data } = await supabase
+          .from('figma_connections')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data) {
+          cleanup();
+          if (popup && !popup.closed) popup.close();
           loadFigmaConnection();
         }
-      }, 500);
+      }, 1500);
 
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        window.removeEventListener('message', handleMessage);
-      }, 300000);
+      setTimeout(cleanup, 300000);
     } catch (error) {
       console.error('Error connecting to Figma:', error);
-      alert(`Failed to connect to Figma: ${error instanceof Error ? error.message : 'Please try again.'}`);
+      setNotification({ type: 'error', message: error instanceof Error ? error.message : 'Failed to connect to Figma. Please try again.' });
     }
   };
 
@@ -525,7 +540,7 @@ export function SettingsPage() {
 
   const loadSlackChannelsQuietly = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getValidSession().catch(() => null);
       if (!session) return;
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
@@ -550,27 +565,9 @@ export function SettingsPage() {
   const loadSlackChannels = async () => {
     setLoadingChannels(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      console.log('Session result:', {
-        hasSession: !!session,
-        hasError: !!sessionError,
-        errorMessage: sessionError?.message,
-        userId: session?.user?.id
-      });
-
-      if (sessionError || !session) {
-        console.error('Session error:', sessionError);
-        throw new Error('Please sign in again to manage Slack channels');
-      }
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
-
-      console.log('Calling edge function:', {
-        url: apiUrl,
-        hasToken: !!session.access_token,
-        tokenPreview: session.access_token.substring(0, 20) + '...'
-      });
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -617,11 +614,7 @@ export function SettingsPage() {
   const saveListeningChannels = async () => {
     setSaving(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        throw new Error('Please sign in again to save channels');
-      }
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-channels`;
 
@@ -673,9 +666,9 @@ export function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="h-full">
-        <PageHeader title="Settings" />
-        <div className="flex items-center justify-center h-full">
+      <div className="h-full flex flex-col bg-white">
+        <PageHeader title="Settings" icon={SettingsIcon} subtitle="Manage your account and preferences." />
+        <div className="flex items-center justify-center flex-1">
           <div className="text-gray-500">Loading...</div>
         </div>
       </div>
@@ -683,33 +676,33 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#F6F7F9]">
-      <PageHeader title="Settings" />
+    <div className="h-full flex flex-col bg-white">
+      <PageHeader title="Settings" icon={SettingsIcon} subtitle="Manage your account and preferences." />
+
+      {/* Tab bar */}
+      <div className="border-b border-gray-100 px-8">
+        <div className="flex gap-1 overflow-x-auto py-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                  activeTab === tab.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="flex border-b border-gray-200">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-medium transition-colors ${
-                      activeTab === tab.id
-                        ? 'text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50'
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Icon size={18} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="p-8">
+        <div className="max-w-3xl">
+            <div>
               {activeTab === 'profile' && (
                 <div className="space-y-6">
                   <div>
@@ -736,7 +729,7 @@ export function SettingsPage() {
                           type="text"
                           value={profileData.full_name}
                           onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                           placeholder="Enter your full name"
                         />
                       </div>
@@ -747,7 +740,7 @@ export function SettingsPage() {
                     <button
                       onClick={saveProfile}
                       disabled={saving}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                     >
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Changes'}
@@ -758,6 +751,16 @@ export function SettingsPage() {
 
               {activeTab === 'integrations' && (
                 <div className="space-y-8">
+                  {notification && (
+                    <div className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between ${
+                      notification.type === 'success'
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                    }`}>
+                      <span>{notification.message}</span>
+                      <button onClick={() => setNotification(null)} className="ml-4 opacity-60 hover:opacity-100 text-lg leading-none">×</button>
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Figma Integration</h3>
                     <p className="text-sm text-gray-600 mb-6">
@@ -766,7 +769,7 @@ export function SettingsPage() {
 
                     {figmaConnection ? (
                       <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6">
+                        <div className="border border-green-200 bg-green-50 rounded-2xl p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-4">
                               <div className="bg-green-500 rounded-xl p-3">
@@ -795,7 +798,7 @@ export function SettingsPage() {
                           </div>
                         </div>
 
-                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+                        <div className="border border-gray-100 rounded-2xl p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="text-lg font-semibold text-gray-900 mb-1">
@@ -807,7 +810,7 @@ export function SettingsPage() {
                             </div>
                             <button
                               onClick={() => setShowAddFileModal(true)}
-                              className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors"
+                              className="flex items-center gap-2 px-4 py-2 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors"
                             >
                               <Link2 size={18} />
                               Add File
@@ -827,7 +830,7 @@ export function SettingsPage() {
                                         href={file.file_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="font-medium text-gray-900 hover:text-[#2563EB] transition-colors truncate"
+                                        className="font-medium text-gray-900 hover:text-[#D4A017] transition-colors truncate"
                                       >
                                         {file.file_name}
                                       </a>
@@ -854,7 +857,7 @@ export function SettingsPage() {
                                     <button
                                       onClick={() => handleSyncFile(file.id)}
                                       disabled={syncingFile === file.id}
-                                      className="p-2 text-[#2563EB] hover:text-[#1d4ed8] hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                                      className="p-2 text-[#D4A017] hover:text-[#B8860B] hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50"
                                       title="Sync comments now"
                                     >
                                       <RefreshCw size={20} className={syncingFile === file.id ? 'animate-spin' : ''} />
@@ -881,10 +884,10 @@ export function SettingsPage() {
                       </div>
                     ) : profileData.figma_token ? (
                       <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-6">
+                        <div className="border border-yellow-200 bg-yellow-50 rounded-2xl p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-4">
-                              <div className="bg-blue-500 rounded-xl p-3">
+                              <div className="bg-[#F5C430] rounded-xl p-3">
                                 <CheckCircle size={24} className="text-white" />
                               </div>
                               <div>
@@ -910,10 +913,10 @@ export function SettingsPage() {
                           </div>
                         </div>
 
-                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+                        <div className="border border-gray-100 rounded-2xl p-6">
                           <div className="flex items-start gap-3 mb-4">
-                            <div className="bg-blue-100 rounded-xl p-2.5">
-                              <SettingsIcon size={20} className="text-[#2563EB]" />
+                            <div className="bg-amber-50 rounded-xl p-2.5">
+                              <SettingsIcon size={20} className="text-[#D4A017]" />
                             </div>
                             <div>
                               <h4 className="text-lg font-semibold text-gray-900 mb-1">
@@ -930,13 +933,13 @@ export function SettingsPage() {
                                   type="password"
                                   value={profileData.figma_token}
                                   onChange={(e) => setProfileData({ ...profileData, figma_token: e.target.value })}
-                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] mb-3"
+                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] mb-3"
                                   placeholder="figd_..."
                                 />
                                 <button
                                   onClick={saveProfile}
                                   disabled={saving}
-                                  className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                                  className="flex items-center gap-2 px-4 py-2 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                                 >
                                   <Save size={18} />
                                   {saving ? 'Updating...' : 'Update Token'}
@@ -948,9 +951,9 @@ export function SettingsPage() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl p-6">
+                        <div className="border border-gray-100 rounded-2xl p-6">
                           <div className="flex items-start gap-4 mb-6">
-                            <div className="bg-gray-300 rounded-xl p-3">
+                            <div className="bg-gray-100 rounded-xl p-3">
                               <Link2 size={24} className="text-gray-600" />
                             </div>
                             <div>
@@ -962,15 +965,15 @@ export function SettingsPage() {
                               </p>
                               <ul className="space-y-2 text-sm text-gray-600 mb-4">
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Track comments from specific Figma files
                                 </li>
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Automatic sync of new comments
                                 </li>
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Secure with automatic token refresh
                                 </li>
                               </ul>
@@ -996,14 +999,14 @@ export function SettingsPage() {
                             <div className="w-full border-t border-gray-300"></div>
                           </div>
                           <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-[#F6F7F9] text-gray-500">or</span>
+                            <span className="px-4 bg-white text-gray-500">or</span>
                           </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-6">
+                        <div className="border border-gray-100 rounded-2xl p-6">
                           <div className="flex items-start gap-4 mb-6">
-                            <div className="bg-blue-500 rounded-xl p-3">
-                              <Key size={24} className="text-white" />
+                            <div className="bg-gray-100 rounded-xl p-3">
+                              <Key size={24} className="text-gray-600" />
                             </div>
                             <div>
                               <h4 className="text-lg font-semibold text-gray-900 mb-2">
@@ -1014,15 +1017,15 @@ export function SettingsPage() {
                               </p>
                               <ul className="space-y-2 text-sm text-gray-600 mb-4">
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Direct API access without OAuth
                                 </li>
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Full control over token permissions
                                 </li>
                                 <li className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                  <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                   Manual token management
                                 </li>
                               </ul>
@@ -1034,7 +1037,7 @@ export function SettingsPage() {
                                   type="password"
                                   value={profileData.figma_token}
                                   onChange={(e) => setProfileData({ ...profileData, figma_token: e.target.value })}
-                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                                   placeholder="figd_..."
                                 />
                                 <p className="mt-2 text-xs text-gray-500">
@@ -1043,7 +1046,7 @@ export function SettingsPage() {
                                     href="https://www.figma.com/developers/api#access-tokens"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[#2563EB] hover:underline"
+                                    className="text-[#D4A017] hover:underline"
                                   >
                                     Figma Settings
                                   </a>
@@ -1054,7 +1057,7 @@ export function SettingsPage() {
                           <button
                             onClick={saveProfile}
                             disabled={saving || !profileData.figma_token}
-                            className="flex items-center gap-3 px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-3 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Save size={18} />
                             {saving ? 'Saving...' : 'Save MCP Token'}
@@ -1072,7 +1075,7 @@ export function SettingsPage() {
 
                     {profileData.slack_access_token ? (
                       <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6">
+                        <div className="border border-green-200 bg-green-50 rounded-2xl p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-4">
                               <div className="bg-green-500 rounded-xl p-3">
@@ -1108,11 +1111,11 @@ export function SettingsPage() {
                           )}
                         </div>
 
-                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+                        <div className="border border-gray-100 rounded-2xl p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-start gap-3">
-                              <div className="bg-blue-100 rounded-xl p-2.5">
-                                <Hash size={20} className="text-[#2563EB]" />
+                              <div className="bg-amber-50 rounded-xl p-2.5">
+                                <Hash size={20} className="text-[#D4A017]" />
                               </div>
                               <div>
                                 <h4 className="text-lg font-semibold text-gray-900 mb-1">
@@ -1126,7 +1129,7 @@ export function SettingsPage() {
                           </div>
 
                           {selectedChannels.length > 0 && !showChannelSelector && (
-                            <div className="mb-4 p-4 bg-blue-50 rounded-xl">
+                            <div className="mb-4 p-4 bg-yellow-50 rounded-xl">
                               <p className="text-sm font-medium text-gray-700 mb-2">Listening to:</p>
                               <div className="flex flex-wrap gap-2">
                                 {selectedChannels.map((channelId) => {
@@ -1156,7 +1159,7 @@ export function SettingsPage() {
                                       checked={selectedChannels.includes(channel.id)}
                                       onChange={() => toggleChannel(channel.id)}
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-4 h-4 text-[#2563EB] rounded focus:ring-2 focus:ring-[#2563EB] cursor-pointer"
+                                      className="w-4 h-4 text-[#D4A017] rounded focus:ring-2 focus:ring-[#F5C430] cursor-pointer"
                                     />
                                     <Hash size={16} className="text-gray-400 pointer-events-none" />
                                     <span className="flex-1 text-sm font-medium text-gray-900 pointer-events-none">
@@ -1173,7 +1176,7 @@ export function SettingsPage() {
                                 <button
                                   onClick={saveListeningChannels}
                                   disabled={saving}
-                                  className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                                  className="flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                                 >
                                   <Save size={18} />
                                   {saving ? 'Saving...' : 'Save Channels'}
@@ -1190,7 +1193,7 @@ export function SettingsPage() {
                             <button
                               onClick={loadSlackChannels}
                               disabled={loadingChannels}
-                              className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                              className="flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                             >
                               <Hash size={18} />
                               {loadingChannels ? 'Loading...' : 'Manage Channels'}
@@ -1199,9 +1202,9 @@ export function SettingsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl p-6">
+                      <div className="border border-gray-100 rounded-2xl p-6">
                         <div className="flex items-start gap-4 mb-6">
-                          <div className="bg-gray-300 rounded-xl p-3">
+                          <div className="bg-gray-100 rounded-xl p-3">
                             <Link2 size={24} className="text-gray-600" />
                           </div>
                           <div>
@@ -1214,15 +1217,15 @@ export function SettingsPage() {
                             </p>
                             <ul className="space-y-2 text-sm text-gray-600 mb-4">
                               <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                 Get instant notifications for new feedback
                               </li>
                               <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                 See feedback ratings and comments in real-time
                               </li>
                               <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-[#2563EB] rounded-full"></span>
+                                <span className="w-1.5 h-1.5 bg-[#F5C430] rounded-full"></span>
                                 Keep your team in the loop automatically
                               </li>
                             </ul>
@@ -1255,7 +1258,7 @@ export function SettingsPage() {
                                 type="text"
                                 value={profileData.slack_webhook_url}
                                 onChange={(e) => setProfileData({ ...profileData, slack_webhook_url: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                                 placeholder="https://hooks.slack.com/services/..."
                               />
                             </div>
@@ -1267,7 +1270,7 @@ export function SettingsPage() {
                                 type="text"
                                 value={profileData.slack_channel}
                                 onChange={(e) => setProfileData({ ...profileData, slack_channel: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                                 placeholder="#design-feedback"
                               />
                             </div>
@@ -1281,7 +1284,7 @@ export function SettingsPage() {
                     <button
                       onClick={saveProfile}
                       disabled={saving}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                     >
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Integrations'}
@@ -1306,7 +1309,7 @@ export function SettingsPage() {
                           type="password"
                           value={passwordData.currentPassword}
                           onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                           placeholder="Enter current password"
                         />
                       </div>
@@ -1319,7 +1322,7 @@ export function SettingsPage() {
                           type="password"
                           value={passwordData.newPassword}
                           onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                           placeholder="Enter new password (min 6 characters)"
                         />
                       </div>
@@ -1332,7 +1335,7 @@ export function SettingsPage() {
                           type="password"
                           value={passwordData.confirmPassword}
                           onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                           placeholder="Confirm new password"
                         />
                       </div>
@@ -1343,7 +1346,7 @@ export function SettingsPage() {
                     <button
                       onClick={handleChangePassword}
                       disabled={changingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Key size={18} />
                       {changingPassword ? 'Changing...' : 'Change Password'}
@@ -1360,7 +1363,7 @@ export function SettingsPage() {
                       Manage your plan and billing settings
                     </p>
 
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6">
+                    <div className="border border-gray-100 rounded-2xl p-6 mb-6">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <h4 className="text-lg font-semibold text-gray-900 mb-1">Free trial</h4>
@@ -1372,7 +1375,7 @@ export function SettingsPage() {
                       <p className="text-sm text-gray-600">14 days remaining</p>
                     </div>
 
-                    <div className="bg-white border-2 border-[#2563EB] rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white border-2 border-[#F5C430] rounded-2xl p-8 shadow-sm">
                       <h4 className="text-2xl font-bold text-gray-900 mb-1">Pro — for individuals</h4>
                       <div className="mb-6">
                         <span className="text-4xl font-bold text-gray-900">€15</span>
@@ -1382,28 +1385,28 @@ export function SettingsPage() {
 
                       <ul className="space-y-4 mb-8 text-gray-700">
                         <li className="flex items-start gap-3">
-                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <CheckCircle size={20} className="text-[#D4A017] flex-shrink-0 mt-0.5" />
                           <span>Collect feedback from all your tools in one place</span>
                         </li>
                         <li className="flex items-start gap-3">
-                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <CheckCircle size={20} className="text-[#D4A017] flex-shrink-0 mt-0.5" />
                           <span>Instantly spot recurring issues and patterns</span>
                         </li>
                         <li className="flex items-start gap-3">
-                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <CheckCircle size={20} className="text-[#D4A017] flex-shrink-0 mt-0.5" />
                           <span>AI-powered insights to guide product decisions</span>
                         </li>
                         <li className="flex items-start gap-3">
-                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <CheckCircle size={20} className="text-[#D4A017] flex-shrink-0 mt-0.5" />
                           <span>A personal dashboard built for solo work</span>
                         </li>
                         <li className="flex items-start gap-3">
-                          <CheckCircle size={20} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                          <CheckCircle size={20} className="text-[#D4A017] flex-shrink-0 mt-0.5" />
                           <span>Priority support</span>
                         </li>
                       </ul>
 
-                      <button className="w-full py-4 bg-[#2563EB] text-white rounded-xl font-semibold hover:bg-[#1d4ed8] transition-all shadow-sm hover:shadow-md mb-4">
+                      <button className="w-full py-4 bg-[#F5C430] text-gray-900 rounded-xl font-semibold hover:bg-[#E8B820] transition-all shadow-sm hover:shadow-md mb-4">
                         Continue with Pro
                       </button>
 
@@ -1415,7 +1418,6 @@ export function SettingsPage() {
                 </div>
               )}
             </div>
-          </div>
         </div>
       </div>
 

@@ -350,7 +350,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-[#F5C430] rounded-lg flex items-center justify-center">
               <MessageSquare size={18} className="text-white" />
             </div>
             <div>
@@ -384,13 +384,13 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
             ) : (
               <>
                 {activePin && !activePin.id && (
-                  <div className="bg-[#EEF2FF] rounded-xl p-4 border-2 border-[#2563EB]">
+                  <div className="bg-[#EEF2FF] rounded-xl p-4 border-2 border-[#F5C430]">
                     <div className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+                      <div className="w-6 h-6 rounded-full bg-[#F5C430] flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
                         {activePin.number}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-[#2563EB] font-medium">New comment pin placed</p>
+                        <p className="text-xs text-[#D4A017] font-medium">New comment pin placed</p>
                         <p className="text-xs text-gray-600 mt-1">Add your feedback below</p>
                       </div>
                     </div>
@@ -401,13 +401,13 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                     key={pin.id}
                     className={`bg-white rounded-xl p-4 border-2 transition-all cursor-pointer ${
                       activePin?.id === pin.id
-                        ? 'border-[#2563EB] shadow-md'
+                        ? 'border-[#F5C430] shadow-md'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => pin.comment && setActivePin(pin)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+                      <div className="w-6 h-6 rounded-full bg-[#F5C430] flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
                         {pin.number}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -461,7 +461,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                       onClick={() => setRating(value)}
                       className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                         rating === value
-                          ? 'bg-[#2563EB] scale-110'
+                          ? 'bg-[#F5C430] scale-110'
                           : 'bg-gray-100 hover:bg-gray-200'
                       }`}
                     >
@@ -478,7 +478,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                   placeholder="Share your feedback..."
                   rows={3}
                   autoFocus
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-sm text-gray-900 placeholder:text-gray-400"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#F5C430] text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <div className="flex items-center justify-between">
                   <button
@@ -495,7 +495,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                   <button
                     onClick={handleSendComment}
                     disabled={!newComment.trim() || sending}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#F5C430] text-gray-900 rounded-lg text-sm font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send size={14} />
                     {sending ? 'Sending...' : 'Post'}
@@ -533,8 +533,8 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                 {commentPins.map((pin) => (
                   <button
                     key={pin.id || `${pin.x}-${pin.y}`}
-                    className={`absolute w-8 h-8 rounded-full bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center shadow-lg transition-all border-2 border-white ${
-                      activePin?.id === pin.id ? 'scale-125 ring-4 ring-[#2563EB]/30' : 'hover:scale-110'
+                    className={`absolute w-8 h-8 rounded-full bg-[#F5C430] text-gray-900 font-bold text-sm flex items-center justify-center shadow-lg transition-all border-2 border-white ${
+                      activePin?.id === pin.id ? 'scale-125 ring-4 ring-[#F5C430]/30' : 'hover:scale-110'
                     }`}
                     style={{
                       left: `${pin.x}%`,
@@ -548,7 +548,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                 ))}
                 {activePin && !activePin.id && (
                   <div
-                    className="absolute w-8 h-8 rounded-full bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white animate-pulse"
+                    className="absolute w-8 h-8 rounded-full bg-[#F5C430] text-gray-900 font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white animate-pulse"
                     style={{
                       left: `${activePin.x}%`,
                       top: `${activePin.y}%`,
@@ -563,8 +563,8 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
               currentDesign.source_type === 'figma' ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center bg-white rounded-2xl p-12 shadow-lg">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#F6F8FE] mb-4">
-                      <MessageSquare size={40} className="text-[#2563EB]" />
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#FFFBEB] mb-4">
+                      <MessageSquare size={40} className="text-[#D4A017]" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Figma Design</h3>
                     <p className="text-gray-600 mb-6 max-w-sm">This design is linked from Figma. Click below to view it.</p>
@@ -572,7 +572,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                       href={currentDesign.source_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <ExternalLink size={18} />
@@ -591,7 +591,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                             onClick={() => setCommentMode(true)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                               commentMode
-                                ? 'bg-[#2563EB] text-white shadow-sm'
+                                ? 'bg-[#F5C430] text-gray-900 shadow-sm'
                                 : 'text-gray-600 hover:text-gray-900'
                             }`}
                           >
@@ -602,7 +602,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                             onClick={() => setCommentMode(false)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                               !commentMode
-                                ? 'bg-[#2563EB] text-white shadow-sm'
+                                ? 'bg-[#F5C430] text-gray-900 shadow-sm'
                                 : 'text-gray-600 hover:text-gray-900'
                             }`}
                           >
@@ -655,8 +655,8 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                     {commentPins.map((pin) => (
                       <button
                         key={pin.id || `${pin.x}-${pin.y}`}
-                        className={`absolute w-8 h-8 rounded-full bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center shadow-lg transition-all border-2 border-white z-10 ${
-                          activePin?.id === pin.id ? 'scale-125 ring-4 ring-[#2563EB]/30' : 'hover:scale-110'
+                        className={`absolute w-8 h-8 rounded-full bg-[#F5C430] text-gray-900 font-bold text-sm flex items-center justify-center shadow-lg transition-all border-2 border-white z-10 ${
+                          activePin?.id === pin.id ? 'scale-125 ring-4 ring-[#F5C430]/30' : 'hover:scale-110'
                         }`}
                         style={{
                           left: `${pin.x}%`,
@@ -670,7 +670,7 @@ export function PublicFeedbackPage({ token }: PublicFeedbackPageProps) {
                     ))}
                     {activePin && !activePin.id && (
                       <div
-                        className="absolute w-8 h-8 rounded-full bg-[#2563EB] text-white font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white z-10 animate-pulse"
+                        className="absolute w-8 h-8 rounded-full bg-[#F5C430] text-gray-900 font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white z-10 animate-pulse"
                         style={{
                           left: `${activePin.x}%`,
                           top: `${activePin.y}%`,

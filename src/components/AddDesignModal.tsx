@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, FileImage } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, getValidSession } from '../lib/supabase';
 
 interface AddDesignModalProps {
   projectId: string;
@@ -125,8 +125,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
 
     setUploading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const session = await getValidSession();
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-import`,
@@ -220,10 +219,10 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
 
               <button
                 onClick={() => setUploadMethod('upload')}
-                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#2563EB] hover:bg-[#F6F8FE] transition-all group"
+                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#F5C430] hover:bg-[#FFFBEB] transition-all group"
               >
-                <div className="w-12 h-12 bg-[#F6F8FE] rounded-xl flex items-center justify-center group-hover:bg-[#2563EB] transition-colors">
-                  <Upload size={24} className="text-[#2563EB] group-hover:text-white" />
+                <div className="w-12 h-12 bg-[#FFFBEB] rounded-xl flex items-center justify-center group-hover:bg-[#F5C430] transition-colors">
+                  <Upload size={24} className="text-[#D4A017] group-hover:text-gray-900" />
                 </div>
                 <div className="flex-1 text-left">
                   <h4 className="font-semibold text-gray-900 mb-1">Upload Files</h4>
@@ -233,10 +232,10 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
 
               <button
                 onClick={() => setUploadMethod('figma')}
-                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#2563EB] hover:bg-[#F6F8FE] transition-all group"
+                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#F5C430] hover:bg-[#FFFBEB] transition-all group"
               >
-                <div className="w-12 h-12 bg-[#F6F8FE] rounded-xl flex items-center justify-center group-hover:bg-[#2563EB] transition-colors">
-                  <LinkIcon size={24} className="text-[#2563EB] group-hover:text-white" />
+                <div className="w-12 h-12 bg-[#FFFBEB] rounded-xl flex items-center justify-center group-hover:bg-[#F5C430] transition-colors">
+                  <LinkIcon size={24} className="text-[#D4A017] group-hover:text-gray-900" />
                 </div>
                 <div className="flex-1 text-left">
                   <h4 className="font-semibold text-gray-900 mb-1">Add Figma Link</h4>
@@ -246,10 +245,10 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
 
               <button
                 onClick={() => setUploadMethod('url')}
-                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#2563EB] hover:bg-[#F6F8FE] transition-all group"
+                className="w-full flex items-center gap-4 p-6 border-2 border-gray-200 rounded-2xl hover:border-[#F5C430] hover:bg-[#FFFBEB] transition-all group"
               >
-                <div className="w-12 h-12 bg-[#F6F8FE] rounded-xl flex items-center justify-center group-hover:bg-[#2563EB] transition-colors">
-                  <LinkIcon size={24} className="text-[#2563EB] group-hover:text-white" />
+                <div className="w-12 h-12 bg-[#FFFBEB] rounded-xl flex items-center justify-center group-hover:bg-[#F5C430] transition-colors">
+                  <LinkIcon size={24} className="text-[#D4A017] group-hover:text-gray-900" />
                 </div>
                 <div className="flex-1 text-left">
                   <h4 className="font-semibold text-gray-900 mb-1">Add Prototype URL</h4>
@@ -287,7 +286,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                     value={designName}
                     onChange={(e) => setDesignName(e.target.value)}
                     placeholder="E.g., Homepage V2, Dashboard Mockup"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                   />
                 </div>
               ) : (
@@ -301,7 +300,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                       value={folderName}
                       onChange={(e) => setFolderName(e.target.value)}
                       placeholder="E.g., Homepage Redesign, Dashboard Mockups"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Multiple files will be grouped in a folder
@@ -316,7 +315,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                       onChange={(e) => setFolderDescription(e.target.value)}
                       placeholder="Brief description of this collection"
                       rows={2}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] resize-none"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] resize-none"
                     />
                   </div>
                 </>
@@ -333,19 +332,19 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
                     dragActive
-                      ? 'border-[#2563EB] bg-[#F6F8FE]'
+                      ? 'border-[#F5C430] bg-[#FFFBEB]'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
                   <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 bg-[#F6F8FE] rounded-full flex items-center justify-center mb-4">
-                      <ImageIcon size={32} className="text-[#2563EB]" />
+                    <div className="w-16 h-16 bg-[#FFFBEB] rounded-full flex items-center justify-center mb-4">
+                      <ImageIcon size={32} className="text-[#D4A017]" />
                     </div>
                     <p className="text-gray-700 font-medium mb-2">
                       Drag and drop your images here
                     </p>
                     <p className="text-sm text-gray-500 mb-4">or</p>
-                    <label className="px-6 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors cursor-pointer">
+                    <label className="px-6 py-2 bg-[#F5C430] text-gray-900 rounded-xl font-semibold hover:bg-[#E8B820] transition-colors cursor-pointer">
                       Browse Files
                       <input
                         type="file"
@@ -369,10 +368,10 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                     {files.map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 bg-[#F6F8FE] rounded-xl"
+                        className="flex items-center justify-between p-3 bg-[#FFFBEB] rounded-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <ImageIcon size={20} className="text-[#2563EB]" />
+                          <ImageIcon size={20} className="text-[#D4A017]" />
                           <span className="text-sm text-gray-700">{file.name}</span>
                           <span className="text-xs text-gray-500">
                             ({(file.size / 1024 / 1024).toFixed(2)} MB)
@@ -402,7 +401,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                 <button
                   type="submit"
                   disabled={files.length === 0 || uploading}
-                  className="flex-1 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? 'Uploading...' : `Upload ${files.length} ${files.length === 1 ? 'File' : 'Files'}`}
                 </button>
@@ -419,7 +418,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                   value={designName}
                   onChange={(e) => setDesignName(e.target.value)}
                   placeholder="E.g., Homepage V2, Dashboard Mockup"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                 />
               </div>
 
@@ -433,7 +432,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                   onChange={(e) => setFigmaUrl(e.target.value)}
                   required
                   placeholder="https://figma.com/file/..."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                 />
                 <p className="text-xs text-gray-500 mt-2">
                   Paste the link to your Figma file or frame
@@ -451,7 +450,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                 <button
                   type="submit"
                   disabled={!figmaUrl || uploading}
-                  className="flex-1 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? 'Adding...' : 'Add Figma Link'}
                 </button>
@@ -469,7 +468,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                   onChange={(e) => setDesignName(e.target.value)}
                   required
                   placeholder="E.g., Homepage Prototype, Mobile App Demo"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                 />
               </div>
 
@@ -483,7 +482,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                   onChange={(e) => setCustomUrl(e.target.value)}
                   required
                   placeholder="https://example.com/prototype"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                 />
                 <p className="text-xs text-gray-500 mt-2">
                   Add a link to your prototype, coded demo, or live website
@@ -501,7 +500,7 @@ export function AddDesignModal({ projectId, onClose, onSuccess }: AddDesignModal
                 <button
                   type="submit"
                   disabled={!customUrl || uploading}
-                  className="flex-1 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? 'Adding...' : 'Add Prototype'}
                 </button>

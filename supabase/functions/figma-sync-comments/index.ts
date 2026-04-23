@@ -210,7 +210,8 @@ Deno.serve(async (req: Request) => {
             })
             .eq("user_id", user.id);
         } else {
-          return new Response(JSON.stringify({ error: "Figma authentication expired. Please reconnect." }), {
+          await supabaseAdmin.from("figma_connections").delete().eq("user_id", user.id);
+          return new Response(JSON.stringify({ error: "figma_disconnected" }), {
             status: 401,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -238,12 +239,17 @@ Deno.serve(async (req: Request) => {
         file_key
       });
 
-      let errorMessage = "Failed to fetch Figma comments";
-      if (figmaCommentsResponse.status === 403) {
-        errorMessage = "Access denied. Please check that you have permission to access this Figma file and that your connection is still valid.";
-      } else if (figmaCommentsResponse.status === 404) {
-        errorMessage = "Figma file not found. The file may have been deleted or the URL is incorrect.";
+      if (figmaCommentsResponse.status === 403 || figmaCommentsResponse.status === 401) {
+        await supabaseAdmin.from("figma_connections").delete().eq("user_id", user.id);
+        return new Response(JSON.stringify({ error: "figma_disconnected" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
+
+      const errorMessage = figmaCommentsResponse.status === 404
+        ? "Figma file not found. The file may have been deleted or the URL is incorrect."
+        : "Failed to fetch Figma comments";
 
       return new Response(JSON.stringify({
         error: errorMessage,

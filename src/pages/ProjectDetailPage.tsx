@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, MoreVertical, ExternalLink, Share2, Trash2, Folder, Image as ImageIcon, FileText } from 'lucide-react';
+import { Plus, MoreVertical, ExternalLink, Share2, Trash2, Folder, Image as ImageIcon, FileText, FolderKanban } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AddDesignModal } from '../components/AddDesignModal';
+import { PageHeader } from '../components/PageHeader';
 import { DesignViewerPage } from './DesignViewerPage';
 import { FolderViewerPage } from './FolderViewerPage';
 
@@ -160,16 +161,11 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
   if (loading) {
     return (
       <div className="h-full flex flex-col">
-        <div className="px-8 py-6 border-b border-gray-200">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft size={20} />
-            <span>Back to Projects</span>
-          </button>
-          <h2 className="text-3xl font-bold text-gray-900">{projectName}</h2>
-        </div>
+        <PageHeader
+          title={projectName}
+          icon={FolderKanban}
+          onBack={{ label: 'Back to Projects', onClick: onBack }}
+        />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-gray-500">Loading...</div>
         </div>
@@ -179,32 +175,19 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-8 py-6 border-b border-gray-200">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-        >
-          <ArrowLeft size={20} />
-          <span>Back to Projects</span>
-        </button>
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold text-gray-900">{projectName}</h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors"
-          >
-            <Plus size={20} />
-            <span>Add Design</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title={projectName}
+        icon={FolderKanban}
+        onBack={{ label: 'Back to Projects', onClick: onBack }}
+        action={{ label: 'Add Design', onClick: () => setShowAddModal(true), icon: Plus }}
+      />
 
       <div className="flex-1 overflow-auto p-8">
         {folders.length === 0 && standaloneDesigns.length === 0 && figmaFiles.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#F6F8FE] mb-6">
-                <Plus size={32} className="text-[#2563EB]" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#FFFBEB] mb-6">
+                <Plus size={32} className="text-[#D4A017]" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">No designs yet</h3>
               <p className="text-gray-600 mb-6">
@@ -212,7 +195,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
               </p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors"
+                className="px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-medium hover:bg-[#E8B820] transition-colors"
               >
                 Add Design
               </button>
@@ -227,14 +210,14 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
                   {folders.map((folder) => (
                     <div
                       key={folder.id}
-                      className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-[#2563EB] transition-all cursor-pointer"
+                      className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-[#F5C430] transition-all cursor-pointer"
                       onClick={() => setSelectedFolder(folder.id)}
                     >
                       <div className="p-6">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3 flex-1">
-                            <div className="w-12 h-12 bg-[#F6F8FE] rounded-xl flex items-center justify-center flex-shrink-0">
-                              <Folder size={24} className="text-[#2563EB]" />
+                            <div className="w-12 h-12 bg-[#FFFBEB] rounded-xl flex items-center justify-center flex-shrink-0">
+                              <Folder size={24} className="text-[#D4A017]" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-gray-900 truncate">{folder.name}</h4>
@@ -311,7 +294,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
                       href={file.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg hover:border-[#2563EB] transition-all"
+                      className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg hover:border-[#F5C430] transition-all"
                     >
                       <div className="flex items-start gap-3 mb-4">
                         <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -344,7 +327,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
                       )}
 
                       <div className="mt-4 pt-4 border-t border-gray-100">
-                        <div className="flex items-center gap-2 text-sm text-[#2563EB]">
+                        <div className="flex items-center gap-2 text-sm text-[#D4A017]">
                           <ExternalLink size={16} />
                           <span>Open in Figma</span>
                         </div>
@@ -375,7 +358,7 @@ export function ProjectDetailPage({ projectId, projectName, onBack }: ProjectDet
                   ) : design.source_url ? (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4">
                       <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center">
-                        <ExternalLink size={28} className="text-[#2563EB]" />
+                        <ExternalLink size={28} className="text-[#D4A017]" />
                       </div>
                       <p className="text-sm text-gray-600 text-center font-medium">Prototype Link</p>
                     </div>

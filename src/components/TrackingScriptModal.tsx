@@ -117,9 +117,9 @@ export function TrackingScriptModal({ onClose }: TrackingScriptModalProps) {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-blue-900 mb-1">Note</h3>
-            <p className="text-sm text-blue-800">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-yellow-900 mb-1">Note</h3>
+            <p className="text-sm text-yellow-800">
               If you can't add scripts to your prototype (e.g., Figma embeds, restricted platforms),
               comments will be associated with the entire design rather than specific pages.
             </p>
@@ -129,7 +129,7 @@ export function TrackingScriptModal({ onClose }: TrackingScriptModalProps) {
         <div className="p-6 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2.5 bg-[#2563EB] text-white rounded-lg font-medium hover:bg-[#1d4ed8] transition-colors"
+            className="w-full px-4 py-2.5 bg-[#F5C430] text-gray-900 rounded-lg font-medium hover:bg-[#E8B820] transition-colors"
           >
             Got it
           </button>

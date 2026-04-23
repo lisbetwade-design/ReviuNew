@@ -22,7 +22,7 @@ export function StakeholderWelcomeModal({ onComplete }: StakeholderWelcomeModalP
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#2563EB] rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#F5C430] rounded-2xl mb-4">
             <MessageSquare size={32} className="text-white" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Reviu</h2>
@@ -40,7 +40,7 @@ export function StakeholderWelcomeModal({ onComplete }: StakeholderWelcomeModalP
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="John"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] text-gray-900"
             />
           </div>
 
@@ -54,7 +54,7 @@ export function StakeholderWelcomeModal({ onComplete }: StakeholderWelcomeModalP
               onChange={(e) => setSurname(e.target.value)}
               required
               placeholder="Doe"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] text-gray-900"
             />
           </div>
 
@@ -68,7 +68,7 @@ export function StakeholderWelcomeModal({ onComplete }: StakeholderWelcomeModalP
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="john@example.com"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] text-gray-900"
             />
           </div>
 
@@ -82,14 +82,14 @@ export function StakeholderWelcomeModal({ onComplete }: StakeholderWelcomeModalP
               onChange={(e) => setRole(e.target.value)}
               required
               placeholder="Product Manager, Designer, etc."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] text-gray-900"
             />
           </div>
 
           <button
             type="submit"
             disabled={!name.trim() || !surname.trim() || !role.trim() || !email.trim()}
-            className="w-full py-3 bg-[#2563EB] text-white rounded-xl font-semibold hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+            className="w-full py-3 bg-[#F5C430] text-gray-900 rounded-xl font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
           >
             Review Designs
           </button>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Search, MoreVertical, MessageCircle, Sparkles, X, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Plus, ChevronDown, ChevronUp, Send } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useRef } from 'react';
+import { Search, MoreVertical, Sparkles, X, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Plus } from 'lucide-react';
+import { supabase, getValidSession } from '../lib/supabase';
 
-interface Comment {
+export interface Comment {
   id: string;
   content: string;
   author_name: string;
@@ -10,13 +10,18 @@ interface Comment {
   rating: number | null;
   status: string;
   created_at: string;
+  x_position: number | null;
+  y_position: number | null;
 }
 
 interface FeedbackPanelProps {
   designId: string;
+  onCommentsLoaded?: (comments: Comment[]) => void;
+  activeCommentId?: string | null;
+  onCommentClick?: (id: string) => void;
 }
 
-export function FeedbackPanel({ designId }: FeedbackPanelProps) {
+export function FeedbackPanel({ designId, onCommentsLoaded, activeCommentId, onCommentClick }: FeedbackPanelProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,9 +31,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
   const [showSummary, setShowSummary] = useState(false);
   const [addingToBoard, setAddingToBoard] = useState<string | null>(null);
   const [boardItems, setBoardItems] = useState<any[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [sendingComment, setSendingComment] = useState(false);
-  const [showCommentInput, setShowCommentInput] = useState(false);
+  const activeCommentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadData();
@@ -53,6 +56,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
 
       if (commentsError) throw commentsError;
       setComments(commentsData || []);
+      onCommentsLoaded?.(commentsData || []);
 
       if (design.project_id) {
         const { data: summaryData, error: summaryError } = await supabase
@@ -89,9 +93,9 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
     setShowSummary(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getValidSession();
 
-      const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const authToken = session.access_token;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-summary`,
@@ -173,47 +177,12 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
     return boardItems.some(item => item.title === stepTitle);
   };
 
-  const handleSendComment = async () => {
-    if (!newComment.trim() || !projectId) return;
-
-    setSendingComment(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert('You must be logged in to comment');
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name, email')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const { error } = await supabase
-        .from('comments')
-        .insert({
-          design_id: designId,
-          project_id: projectId,
-          created_by: user.id,
-          author_name: profile?.display_name || user.email || 'Team Member',
-          author_email: user.email || '',
-          content: newComment.trim(),
-          status: 'open',
-        });
-
-      if (error) throw error;
-
-      setNewComment('');
-      setShowCommentInput(false);
-      await loadData();
-    } catch (error) {
-      console.error('Error sending comment:', error);
-      alert('Failed to send comment. Please try again.');
-    } finally {
-      setSendingComment(false);
+  useEffect(() => {
+    if (activeCommentId && activeCommentRef.current) {
+      activeCommentRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  };
+  }, [activeCommentId]);
+
 
   const getSourceBadge = (email: string | null) => {
     if (!email) return { label: 'Guest', color: 'bg-gray-100 text-gray-600', icon: null };
@@ -228,7 +197,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
   const getRoleBadge = (email: string | null) => {
     if (!email) return null;
     if (email.includes('pm') || email.toLowerCase().includes('manager')) {
-      return { label: 'PM', color: 'bg-blue-100 text-blue-700' };
+      return { label: 'PM', color: 'bg-yellow-100 text-yellow-700' };
     }
     if (email.includes('designer')) {
       return { label: 'Designer', color: 'bg-pink-100 text-pink-700' };
@@ -276,7 +245,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
     if (priority === 'critical' || priority === 'urgent') return 'bg-red-100 text-red-700';
     if (priority === 'high') return 'bg-orange-100 text-orange-700';
     if (priority === 'low') return 'bg-gray-100 text-gray-700';
-    return 'bg-blue-100 text-blue-700';
+    return 'bg-yellow-100 text-yellow-700';
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -284,7 +253,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
       critical: 'bg-red-100 text-red-700',
       urgent: 'bg-red-100 text-red-700',
       high: 'bg-orange-100 text-orange-700',
-      medium: 'bg-blue-100 text-blue-700',
+      medium: 'bg-yellow-100 text-yellow-700',
       low: 'bg-gray-100 text-gray-700',
     };
     return colors[priority as keyof typeof colors] || colors.medium;
@@ -305,7 +274,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
           {summary && !showSummary ? (
             <button
               onClick={() => setShowSummary(true)}
-              className="text-[#2563EB] text-sm font-medium hover:underline transition-colors"
+              className="text-[#D4A017] text-sm font-medium hover:underline transition-colors"
             >
               Open summary
             </button>
@@ -313,7 +282,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
             <button
               onClick={handleGenerateSummary}
               disabled={generatingSummary || !projectId || comments.length === 0}
-              className="flex items-center gap-1.5 text-[#2563EB] text-sm font-medium hover:text-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 text-[#D4A017] text-sm font-medium hover:text-[#B8860B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Sparkles size={14} className={generatingSummary ? 'animate-pulse' : ''} />
               {generatingSummary ? 'Generating...' : 'Generate summary'}
@@ -329,7 +298,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search feedback..."
-              className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-gray-50"
+              className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430] bg-gray-50"
             />
           </div>
         )}
@@ -350,7 +319,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
 
             {generatingSummary ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Sparkles size={48} className="text-[#2563EB] animate-pulse mb-4" />
+                <Sparkles size={48} className="text-[#D4A017] animate-pulse mb-4" />
                 <p className="text-lg font-medium text-gray-900 mb-2">Analyzing feedback...</p>
                 <p className="text-sm text-gray-500">This may take a moment</p>
               </div>
@@ -413,7 +382,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
                   {summaryData.actionableNextSteps && summaryData.actionableNextSteps.length > 0 ? (
                     <div className="space-y-3">
                       {summaryData.actionableNextSteps.map((step: any, i: number) => (
-                        <div key={i} className="p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-[#2563EB] transition-colors">
+                        <div key={i} className="p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-[#F5C430] transition-colors">
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-semibold text-gray-900 flex-1">{step.title}</h4>
                             <div className="flex items-center gap-2">
@@ -435,7 +404,7 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
                             <button
                               onClick={() => handleAddToBoard(step)}
                               disabled={addingToBoard === step.title}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5C430] text-gray-900 rounded-lg text-sm font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50"
                             >
                               <Plus size={14} />
                               {addingToBoard === step.title ? 'Adding...' : 'Add to Board'}
@@ -470,14 +439,18 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
                 const roleBadge = getRoleBadge(comment.author_email);
                 const statusBadge = getStatusBadge(comment.status);
                 const emoji = getRatingEmoji(comment.rating);
+                const isActive = activeCommentId === comment.id;
+                const hasPin = comment.x_position != null && comment.y_position != null;
 
                 return (
                   <div
                     key={comment.id}
-                    className="bg-white rounded-xl p-3 hover:bg-gray-50 transition-colors"
+                    ref={isActive ? activeCommentRef : null}
+                    onClick={() => hasPin && onCommentClick?.(comment.id)}
+                    className={`rounded-xl p-3 transition-colors ${isActive ? 'bg-amber-50 ring-2 ring-[#F5C430]' : 'bg-white hover:bg-gray-50'} ${hasPin ? 'cursor-pointer' : ''}`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      <div className="flex-shrink-0 w-8 h-8 bg-[#F5C430] rounded-full flex items-center justify-center text-gray-900 text-xs font-bold">
                         {idx + 1}
                       </div>
 
@@ -532,49 +505,6 @@ export function FeedbackPanel({ designId }: FeedbackPanelProps) {
               })}
             </div>
 
-            {!showSummary && (
-              <div className="mt-4 border-t border-gray-200 pt-4">
-                {showCommentInput ? (
-                  <div className="space-y-3">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add your feedback..."
-                      rows={3}
-                      autoFocus
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-sm text-gray-900 placeholder:text-gray-400"
-                    />
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => {
-                          setShowCommentInput(false);
-                          setNewComment('');
-                        }}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSendComment}
-                        disabled={!newComment.trim() || sendingComment}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Send size={14} />
-                        {sendingComment ? 'Sending...' : 'Post'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowCommentInput(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 font-medium border border-gray-200"
-                  >
-                    <MessageCircle size={16} />
-                    Add feedback
-                  </button>
-                )}
-              </div>
-            )}
             </>
           )}
         </div>

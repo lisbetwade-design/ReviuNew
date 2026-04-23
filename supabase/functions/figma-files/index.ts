@@ -191,10 +191,8 @@ Deno.serve(async (req: Request) => {
               console.log("Token refreshed successfully");
             } else {
               console.error("Token refresh failed:", refreshData);
-              return new Response(JSON.stringify({
-                error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
-                details: refreshData.error || "Refresh token invalid"
-              }), {
+              await supabaseClient.from("figma_connections").delete().eq("user_id", user.id);
+              return new Response(JSON.stringify({ error: "figma_disconnected" }), {
                 status: 401,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
               });
@@ -266,10 +264,8 @@ Deno.serve(async (req: Request) => {
                 }
               } else {
                 console.error("Token refresh failed:", refreshData);
-                return new Response(JSON.stringify({
-                  error: "Figma authentication expired. Please reconnect your Figma account in Settings.",
-                  details: refreshData.error || "Refresh token invalid"
-                }), {
+                await supabaseClient.from("figma_connections").delete().eq("user_id", user.id);
+                return new Response(JSON.stringify({ error: "figma_disconnected" }), {
                   status: 401,
                   headers: { ...corsHeaders, "Content-Type": "application/json" },
                 });
@@ -277,10 +273,14 @@ Deno.serve(async (req: Request) => {
             }
           }
 
-          const errorMessage = errorData.err === "Invalid token" || errorData.status === 403
-            ? "Figma token is invalid or has been revoked. Please disconnect and reconnect your Figma account in Settings."
-            : errorData.err || errorData.message || "Failed to fetch file info";
-          return new Response(JSON.stringify({ error: errorMessage, details: errorData }), {
+          if (errorData.err === "Invalid token" || errorData.status === 403 || fileResponse.status === 403) {
+            await supabaseClient.from("figma_connections").delete().eq("user_id", user.id);
+            return new Response(JSON.stringify({ error: "figma_disconnected" }), {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          return new Response(JSON.stringify({ error: errorData.err || errorData.message || "Failed to fetch file info" }), {
             status: fileResponse.status,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });

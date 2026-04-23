@@ -27,7 +27,7 @@ const columns = [
 
 const priorityColors: Record<string, string> = {
   low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
+  medium: 'bg-yellow-100 text-yellow-700',
   high: 'bg-orange-100 text-orange-700',
   critical: 'bg-red-100 text-red-700',
 };
@@ -124,7 +124,7 @@ export function BoardPage() {
   if (loading) {
     return (
       <div className="h-full">
-        <PageHeader title="Board" />
+        <PageHeader title="Board" icon={LayoutDashboard} subtitle="Track and manage design feedback tasks." />
         <div className="flex items-center justify-center h-full">
           <div className="text-gray-500">Loading...</div>
         </div>
@@ -135,7 +135,7 @@ export function BoardPage() {
   if (boardItems.length === 0 && !searchQuery) {
     return (
       <div className="h-full flex flex-col">
-        <PageHeader title="Board" />
+        <PageHeader title="Board" icon={LayoutDashboard} subtitle="Track and manage design feedback tasks." />
         <EmptyState
           icon={LayoutDashboard}
           title="No items on your board yet"
@@ -149,6 +149,8 @@ export function BoardPage() {
     <div className="h-full flex flex-col">
       <PageHeader
         title="Board"
+        icon={LayoutDashboard}
+        subtitle="Track and manage design feedback tasks."
         action={{
           label: 'New Item',
           onClick: () => console.log('New item')
@@ -164,7 +166,7 @@ export function BoardPage() {
               placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
             />
           </div>
           <button
@@ -206,7 +208,7 @@ export function BoardPage() {
 
                 <div
                   className={`flex-1 space-y-3 min-h-[200px] p-3 rounded-2xl transition-all ${
-                    isDropTarget ? 'bg-blue-50 ring-2 ring-blue-300 ring-opacity-50' : 'bg-transparent'
+                    isDropTarget ? 'bg-yellow-50 ring-2 ring-yellow-300 ring-opacity-50' : 'bg-transparent'
                   }`}
                   onDragOver={(e) => handleDragOver(e, column.id)}
                   onDragLeave={handleDragLeave}

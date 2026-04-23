@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Link2, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, getValidSession } from '../lib/supabase';
 
 interface AddFigmaFileModalProps {
   isOpen: boolean;
@@ -21,6 +21,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   const [fetchingFile, setFetchingFile] = useState(false);
   const [fileInfo, setFileInfo] = useState<{ file_key: string; file_name: string; file_url: string } | null>(null);
   const [hasFigmaConnection, setHasFigmaConnection] = useState<boolean | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState({
     sync_all_comments: true,
     sync_only_mentions: false,
@@ -80,29 +81,14 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   };
 
   const handleFetchFileInfo = async () => {
-    if (!fileUrl.trim()) {
-      alert('Please enter a Figma file URL');
-      return;
-    }
+    if (!fileUrl.trim()) return;
 
     setFetchingFile(true);
+    setFetchError(null);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        throw new Error('Failed to get session. Please try refreshing the page.');
-      }
-
-      if (!session) {
-        throw new Error('Not authenticated. Please sign in again.');
-      }
-
-      console.log('Auth token available:', session.access_token ? 'yes' : 'no');
-      console.log('Token preview:', session.access_token.substring(0, 20) + '...');
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files?action=file-info&url=${encodeURIComponent(fileUrl)}`;
-      console.log('Fetching file info from:', apiUrl);
-
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -111,40 +97,23 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         },
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
-        let errorMessage = 'Failed to fetch file info';
         let errorData: any = {};
+        try { errorData = await response.json(); } catch {}
 
-        try {
-          errorData = await response.json();
-          console.error('Error data:', errorData);
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
+        if (errorData.error === 'figma_disconnected' || errorData.error === 'Figma not connected') {
+          setHasFigmaConnection(false);
+          return;
         }
 
-        if (errorData.error === 'Figma not connected') {
-          errorMessage = 'Please connect your Figma account in Settings first.';
-        } else if (response.status === 401) {
-          errorMessage = errorData.details || 'Your session has expired. Please refresh the page and try again.';
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (errorData.details) {
-          errorMessage = errorData.details;
-        } else {
-          errorMessage = `Server error (${response.status}): ${response.statusText}`;
-        }
-
-        throw new Error(errorMessage);
+        setFetchError(errorData.error || errorData.details || `Error ${response.status}: ${response.statusText}`);
+        setFileInfo(null);
+        return;
       }
 
-      const data = await response.json();
-      console.log('File info retrieved:', data);
-      setFileInfo(data);
+      setFileInfo(await response.json());
     } catch (error) {
-      console.error('Error fetching file info:', error);
-      alert(error instanceof Error ? error.message : 'Failed to fetch file info. Make sure you have access to this file.');
+      setFetchError(error instanceof Error ? error.message : 'Failed to fetch file info.');
       setFileInfo(null);
     } finally {
       setFetchingFile(false);
@@ -152,17 +121,12 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   };
 
   const handleAddFile = async () => {
-    if (!fileInfo || !selectedProject) {
-      alert('Please fetch file info and select a project');
-      return;
-    }
+    if (!fileInfo || !selectedProject) return;
 
     setLoading(true);
+    setFetchError(null);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error('Not authenticated. Please refresh the page and try again.');
-      }
+      const session = await getValidSession();
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-files`;
       const response = await fetch(apiUrl, {
@@ -183,10 +147,12 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
 
       if (!response.ok) {
         const errorData = await response.json();
+        if (errorData.error === 'figma_disconnected') {
+          setHasFigmaConnection(false);
+          return;
+        }
         throw new Error(errorData.error || 'Failed to add file');
       }
-
-      const result = await response.json();
 
       const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/figma-sync-comments`;
       const syncResponse = await fetch(syncUrl, {
@@ -202,20 +168,18 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         }),
       });
 
-      if (syncResponse.ok) {
-        const syncResult = await syncResponse.json();
-        alert(`File added successfully! ${syncResult.summary?.added || 0} comments synced.`);
-      } else {
+      if (!syncResponse.ok) {
         const errorData = await syncResponse.json();
-        console.error('Sync error:', errorData);
-        alert('File added but failed to sync comments. Please try syncing manually.');
+        if (errorData.error === 'figma_disconnected') {
+          setHasFigmaConnection(false);
+          return;
+        }
       }
 
       onFileAdded();
       handleClose();
     } catch (error) {
-      console.error('Error adding file:', error);
-      alert(error instanceof Error ? error.message : 'Failed to add file. Please try again.');
+      setFetchError(error instanceof Error ? error.message : 'Failed to add file. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -224,6 +188,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
   const handleClose = () => {
     setFileUrl('');
     setFileInfo(null);
+    setFetchError(null);
     setPreferences({
       sync_all_comments: true,
       sync_only_mentions: false,
@@ -250,12 +215,16 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
         <div className="p-6 space-y-6">
           {hasFigmaConnection === false && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-              <p className="text-sm text-yellow-800 font-medium mb-2">Figma Not Connected</p>
+              <p className="text-sm text-yellow-800 font-medium mb-1">Figma not connected</p>
               <p className="text-sm text-yellow-700">
-                You need to connect your Figma account first. Go to{' '}
-                <a href="/settings" className="underline font-medium">Settings</a> and click
-                "Connect Figma\" to authorize access to your Figma files.
+                Your Figma connection was lost. Please go to Settings and reconnect your Figma account.
               </p>
+            </div>
+          )}
+
+          {fetchError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-700">{fetchError}</p>
             </div>
           )}
 
@@ -269,13 +238,13 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
                 placeholder="https://www.figma.com/file/..."
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                 disabled={fetchingFile || hasFigmaConnection === false}
               />
               <button
                 onClick={handleFetchFileInfo}
                 disabled={fetchingFile || !fileUrl.trim() || hasFigmaConnection === false}
-                className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {fetchingFile ? (
                   <>
@@ -309,7 +278,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
               disabled={projects.length === 0}
             >
               {projects.length === 0 ? (
@@ -339,7 +308,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
                     sync_only_mentions: false,
                     sync_unresolved_only: false,
                   })}
-                  className="w-4 h-4 text-[#2563EB]"
+                  className="w-4 h-4 text-[#D4A017]"
                 />
                 <span className="text-sm text-gray-700">Track all comments</span>
               </label>
@@ -352,7 +321,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
                     sync_only_mentions: false,
                     sync_unresolved_only: true,
                   })}
-                  className="w-4 h-4 text-[#2563EB]"
+                  className="w-4 h-4 text-[#D4A017]"
                 />
                 <span className="text-sm text-gray-700">Only unresolved comments</span>
               </label>
@@ -370,7 +339,7 @@ export function AddFigmaFileModal({ isOpen, onClose, onFileAdded }: AddFigmaFile
           <button
             onClick={handleAddFile}
             disabled={loading || !fileInfo || !selectedProject || projects.length === 0}
-            className="flex items-center gap-2 px-6 py-2 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

@@ -85,7 +85,7 @@ function CreateProjectModal({ onClose, onSuccess }: CreateProjectModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
               placeholder="E.g., Mobile App Redesign"
             />
           </div>
@@ -97,7 +97,7 @@ function CreateProjectModal({ onClose, onSuccess }: CreateProjectModalProps) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
               placeholder="Brief description of your project"
             />
           </div>
@@ -112,7 +112,7 @@ function CreateProjectModal({ onClose, onSuccess }: CreateProjectModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+              className="flex-1 px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-semibold hover:bg-[#E8B820] transition-colors disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Project'}
             </button>
@@ -169,7 +169,7 @@ export function ProjectsPage() {
   if (loading) {
     return (
       <div className="h-full">
-        <PageHeader title="Projects" />
+        <PageHeader title="Projects" icon={FolderKanban} subtitle="Manage your design projects and collect feedback." />
         <div className="flex items-center justify-center h-full">
           <div className="text-gray-500">Loading...</div>
         </div>
@@ -180,7 +180,7 @@ export function ProjectsPage() {
   if (projects.length === 0) {
     return (
       <div className="h-full flex flex-col">
-        <PageHeader title="Projects" />
+        <PageHeader title="Projects" icon={FolderKanban} subtitle="Manage your design projects and collect feedback." />
         <EmptyState
           icon={FolderKanban}
           title="No projects yet"
@@ -204,6 +204,8 @@ export function ProjectsPage() {
     <div className="h-full flex flex-col">
       <PageHeader
         title="Projects"
+        icon={FolderKanban}
+        subtitle="Manage your design projects and collect feedback."
         action={{
           label: 'New Project',
           onClick: () => setShowCreateModal(true),

@@ -328,7 +328,6 @@ Deno.serve(async (req: Request) => {
         code: code,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
-        code_verifier: pkceData.code_verifier,
       }),
     });
 
@@ -530,17 +529,53 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const appUrl = new URL(req.headers.get('referer') || Deno.env.get('APP_URL') || 'https://reviu-jmxo.bolt.host');
-    appUrl.pathname = '/settings';
-    appUrl.searchParams.set('figma_oauth', 'success');
-    appUrl.searchParams.set('figma_email', userData.email || '');
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': appUrl.toString(),
-      },
-    });
+    return new Response(
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <title>Figma Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+            }
+            .container {
+              text-align: center;
+              padding: 2rem;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 1rem;
+              backdrop-filter: blur(10px);
+              max-width: 400px;
+            }
+            h1 { margin: 0 0 1rem 0; }
+            p { margin: 0; opacity: 0.9; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Figma Connected!</h1>
+            <p>Your Figma account has been connected successfully.</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;">This window will close automatically...</p>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'figma-oauth-success', email: '${userData.email || ''}' }, '*');
+            }
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+      </html>`,
+      {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(

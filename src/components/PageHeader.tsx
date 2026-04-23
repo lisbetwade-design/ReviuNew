@@ -1,25 +1,64 @@
+import { ReactNode } from 'react';
+import { LucideIcon, ArrowLeft } from 'lucide-react';
+
 interface PageHeaderProps {
   title: string;
+  subtitle?: string;
+  icon?: LucideIcon;
+  badge?: number;
   action?: {
     label: string;
     onClick: () => void;
+    icon?: LucideIcon;
   };
+  onBack?: {
+    label: string;
+    onClick: () => void;
+  };
+  rightContent?: ReactNode;
 }
 
-export function PageHeader({ title, action }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, icon: Icon, badge, action, onBack, rightContent }: PageHeaderProps) {
+  const ActionIcon = action?.icon;
   return (
-    <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
-      <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'Inria Sans, sans-serif' }}>
-        {title}
-      </h2>
-      {action && (
+    <div className="p-8 border-b border-gray-100">
+      {onBack && (
         <button
-          onClick={action.onClick}
-          className="px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors"
+          onClick={onBack.onClick}
+          className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-4 transition-colors text-sm font-medium"
         >
-          {action.label}
+          <ArrowLeft size={16} />
+          <span>{onBack.label}</span>
         </button>
       )}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            {Icon && (
+              <div className="relative">
+                <Icon size={26} className="text-gray-700" />
+                {badge != null && badge > 0 && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#F5C430] rounded-full" />
+                )}
+              </div>
+            )}
+            <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
+          </div>
+          {subtitle && (
+            <p className="text-gray-500 text-sm">{subtitle}</p>
+          )}
+        </div>
+        {rightContent}
+        {action && (
+          <button
+            onClick={action.onClick}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#F5C430] text-gray-900 rounded-2xl font-semibold hover:bg-[#E8B820] transition-colors"
+          >
+            {ActionIcon && <ActionIcon size={18} />}
+            {action.label}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

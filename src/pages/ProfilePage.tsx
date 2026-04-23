@@ -75,7 +75,7 @@ export function ProfilePage() {
   if (loading) {
     return (
       <div className="h-full">
-        <PageHeader title="Profile" />
+        <PageHeader title="Profile" icon={User} subtitle="Your account information and preferences." />
         <div className="flex items-center justify-center h-full">
           <div className="text-gray-500">Loading...</div>
         </div>
@@ -85,14 +85,14 @@ export function ProfilePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <PageHeader title="Profile" />
+      <PageHeader title="Profile" icon={User} subtitle="Your account information and preferences." />
 
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white border border-gray-200 rounded-2xl p-8">
             <div className="flex items-center gap-4 mb-8">
-              <div className="w-16 h-16 bg-[#F6F8FE] rounded-full flex items-center justify-center">
-                <User size={32} className="text-[#2563EB]" />
+              <div className="w-16 h-16 bg-[#FFFBEB] rounded-full flex items-center justify-center">
+                <User size={32} className="text-[#D4A017]" />
               </div>
               <div>
                 <h3 className="text-xl font-semibold text-gray-900">
@@ -111,7 +111,7 @@ export function ProfilePage() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F5C430]"
                   placeholder="Enter your full name"
                 />
               </div>
@@ -132,7 +132,7 @@ export function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full px-6 py-3 bg-[#2563EB] text-white rounded-2xl font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
+                className="w-full px-6 py-3 bg-[#F5C430] text-gray-900 rounded-2xl font-medium hover:bg-[#E8B820] transition-colors disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

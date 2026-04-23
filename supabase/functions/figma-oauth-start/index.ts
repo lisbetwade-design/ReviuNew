@@ -13,17 +13,6 @@ function generateRandomString(length: number): string {
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function generatePKCEChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-
-  return btoa(String.fromCharCode(...new Uint8Array(hash)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -80,8 +69,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const state = generateRandomString(32);
-    const codeVerifier = generateRandomString(64);
-    const codeChallenge = await generatePKCEChallenge(codeVerifier);
 
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 10);
@@ -95,14 +82,14 @@ Deno.serve(async (req: Request) => {
       .from("oauth_pkce_state")
       .insert({
         state,
-        code_verifier: codeVerifier,
+        code_verifier: "none",
         user_id: user.id,
         provider: "figma",
         expires_at: expiresAt.toISOString(),
       });
 
     if (stateError) {
-      console.error("Error storing PKCE state:", stateError);
+      console.error("Error storing state:", stateError);
       return new Response(
         JSON.stringify({ error: "Failed to initialize OAuth flow" }),
         {
@@ -112,15 +99,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const scopes = "current_user:read,file_content:read,file_comments:read";
+    const scopes = "files:read,file_comments:read";
     const authUrl = new URL("https://www.figma.com/oauth");
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("scope", scopes);
     authUrl.searchParams.set("state", state);
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("code_challenge", codeChallenge);
-    authUrl.searchParams.set("code_challenge_method", "S256");
 
     return new Response(
       JSON.stringify({ authorization_url: authUrl.toString() }),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, MessageSquare, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { FeedbackPanel } from '../components/FeedbackPanel';
+import { FeedbackPanel, Comment } from '../components/FeedbackPanel';
 
 interface Design {
   id: string;
@@ -20,6 +20,8 @@ interface DesignViewerPageProps {
 export function DesignViewerPage({ designId, projectName, onBack }: DesignViewerPageProps) {
   const [design, setDesign] = useState<Design | null>(null);
   const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -42,6 +44,8 @@ export function DesignViewerPage({ designId, projectName, onBack }: DesignViewer
     }
   };
 
+  // Only comments that have position data
+  const pinnedComments = comments.filter(c => c.x_position != null && c.y_position != null);
 
   if (loading) {
     return (
@@ -61,32 +65,56 @@ export function DesignViewerPage({ designId, projectName, onBack }: DesignViewer
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} className="text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">{design.name}</h1>
-              <p className="text-sm text-gray-500">{projectName}</p>
-            </div>
+      <div className="px-6 py-4 border-b border-gray-100 bg-white">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={20} className="text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">{design.name}</h1>
+            <p className="text-sm text-gray-500">{projectName}</p>
           </div>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 bg-[#F6F7F9] flex items-center justify-center p-8 overflow-auto">
+        {/* Design canvas */}
+        <div className="flex-1 bg-[#F0F0F3] flex items-center justify-center p-8 overflow-auto">
           {design.image_url ? (
-            <div className="max-w-full max-h-full">
+            <div className="relative max-w-full max-h-full" onClick={() => setActiveCommentId(null)}>
               <img
                 src={design.image_url}
                 alt={design.name}
-                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-lg"
               />
+              {/* Position markers */}
+              {pinnedComments.map((comment) => {
+                const idx = comments.indexOf(comment);
+                const isActive = activeCommentId === comment.id;
+                return (
+                  <button
+                    key={comment.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveCommentId(isActive ? null : comment.id);
+                    }}
+                    style={{
+                      left: `${comment.x_position}%`,
+                      top: `${comment.y_position}%`,
+                    }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-md border-2 transition-all z-10 ${
+                      isActive
+                        ? 'bg-gray-900 text-white border-white scale-125'
+                        : 'bg-[#F5C430] text-gray-900 border-white hover:scale-110'
+                    }`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
             </div>
           ) : design.source_url ? (
             design.source_type === 'figma' ? (
@@ -100,7 +128,7 @@ export function DesignViewerPage({ designId, projectName, onBack }: DesignViewer
                   href={design.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block px-6 py-3 bg-[#2563EB] text-white rounded-xl font-medium hover:bg-[#1d4ed8] transition-colors"
+                  className="inline-block px-6 py-3 bg-[#F5C430] text-gray-900 rounded-xl font-medium hover:bg-[#E8B820] transition-colors"
                 >
                   Open in Figma
                 </a>
@@ -113,7 +141,7 @@ export function DesignViewerPage({ designId, projectName, onBack }: DesignViewer
                     href={design.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="ml-4 flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors"
+                    className="ml-4 flex items-center gap-2 px-4 py-2 bg-[#F5C430] text-gray-900 rounded-lg text-sm font-medium hover:bg-[#E8B820] transition-colors"
                   >
                     <ExternalLink size={16} />
                     Open in New Tab
@@ -134,7 +162,12 @@ export function DesignViewerPage({ designId, projectName, onBack }: DesignViewer
           )}
         </div>
 
-        <FeedbackPanel designId={designId} />
+        <FeedbackPanel
+          designId={designId}
+          onCommentsLoaded={setComments}
+          activeCommentId={activeCommentId}
+          onCommentClick={(id) => setActiveCommentId(prev => prev === id ? null : id)}
+        />
       </div>
     </div>
   );
